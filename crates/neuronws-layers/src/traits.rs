@@ -1,9 +1,6 @@
 pub trait Layer {}
 
-pub trait Data {
-    type Input;
-    type Output;
-}
+pub trait Data {}
 
 pub trait ForwardData: Data {
     type ForwardInput;
