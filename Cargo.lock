@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "neuronws"
+name = "neuronws-layers"
 version = "0.1.0"
