@@ -29,6 +29,4 @@ pub trait BackwardPath: BackwardData  {
 pub trait BackwardPathMut : BackwardData{
     fn backward_mut(&mut self, input: &Self::BackwardInput) -> &mut Self::BackwardOutput;
 }
-// erst hier macht layer sinn
-pub trait DenseLayer : Layer + ForwardPath {}
-pub trait TrainableDenseLayer : Layer + ForwardPath + BackwardPath {}
+
