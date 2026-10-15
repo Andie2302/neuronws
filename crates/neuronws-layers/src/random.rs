@@ -2,6 +2,7 @@
 ///
 /// Er ist deterministisch: derselbe Startwert (`seed`) liefert immer dieselbe Folge.
 /// Das ist für reproduzierbare Experimente gewollt. Für Kryptografie taugt er nicht.
+#[derive(Debug, Clone)]
 pub struct Rng {
     state: u64,
 }

@@ -4,6 +4,7 @@ use crate::traits::{
     BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
 
+#[derive(Debug, Clone)]
 pub struct DenseLayer<const IN: usize, const OUT: usize, T: Scalar = f32> {
     weights: [[T; IN]; OUT],
     bias: [T; OUT],

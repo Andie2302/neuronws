@@ -10,6 +10,7 @@ use neuronws_layers::traits::{BackwardPathMut, ForwardData, ForwardPath, Forward
 ///
 /// Es ist eine `DenseLayer<IN, 1>` gefolgt von `Step`. Weil es `Layer` und `ForwardPath`
 /// implementiert, lässt es sich wie jede andere Schicht verketten.
+#[derive(Debug, Clone)]
 pub struct Perceptron<const IN: usize, T: Scalar = f32> {
     neuron: DenseLayer<IN, 1, T>,
 }

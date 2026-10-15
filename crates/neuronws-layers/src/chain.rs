@@ -19,6 +19,7 @@ use crate::traits::{
 /// let net = Chain::new(dense, relu);
 /// net.forward(&[1.0, 2.0]);
 /// ```
+#[derive(Debug, Clone)]
 pub struct Chain<A, B> {
     first: A,
     second: B,

@@ -11,6 +11,7 @@ pub trait Optimizer<T: Scalar> {
 }
 
 /// Stochastic Gradient Descent: `p ← p − η · g`.
+#[derive(Debug, Clone)]
 pub struct Sgd<T: Scalar = f32> {
     learning_rate: T,
 }
@@ -51,6 +52,7 @@ impl<T: Scalar> Optimizer<T> for Sgd<T> {
 /// let _momentum = Momentum::<P>::new(0.01, 0.9);
 /// assert_eq!(P, 13);
 /// ```
+#[derive(Debug, Clone)]
 pub struct Momentum<const P: usize, T: Scalar = f32> {
     learning_rate: T,
     momentum: T,

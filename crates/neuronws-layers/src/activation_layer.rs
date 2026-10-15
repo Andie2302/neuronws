@@ -5,6 +5,7 @@ use crate::traits::{
 };
 
 /// Wendet eine Aktivierungsfunktion elementweise auf `N` Werte an.
+#[derive(Debug, Clone)]
 pub struct ActivationLayer<const N: usize, A: Activation, T: Scalar = f32> {
     activation: A,
     /// Die Eingabe `z` des letzten `forward_mut`, die Ableitung `φ'(z)` braucht sie.

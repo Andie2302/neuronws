@@ -8,6 +8,7 @@ use crate::traits::{
 /// Alle Ausgaben liegen in (0, 1) und summieren sich zu 1. Anders als eine elementweise
 /// Aktivierung hängt jede Ausgabe von allen Eingaben ab, deshalb ist Softmax eine eigene Schicht.
 /// Braucht `exp`, also das Feature `std` oder `libm`.
+#[derive(Debug, Clone)]
 pub struct SoftmaxLayer<const N: usize, T: Scalar = f32> {
     output: [T; N],
     grad_input: [T; N],
