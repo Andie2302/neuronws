@@ -7,6 +7,8 @@ pub mod activation;
 pub mod activation_layer;
 #[cfg(any(feature = "std", feature = "libm"))]
 pub mod adam;
+#[cfg(any(feature = "std", feature = "libm"))]
+pub mod adaptive;
 pub mod block;
 #[cfg(feature = "alloc")]
 pub mod boxed;
@@ -30,3 +32,4 @@ pub mod trainer;
 pub mod training;
 pub mod traits;
 pub mod values;
+pub mod wrappers;
