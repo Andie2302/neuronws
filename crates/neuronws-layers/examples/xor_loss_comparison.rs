@@ -20,7 +20,7 @@ const DATA: [([f32; 2], [f32; 1]); 4] = [
 
 /// Anzahl der Runden, bis alle vier Ausgaben auf der richtigen Seite von 0,5 und mindestens
 /// 0,1 von der Schwelle entfernt liegen.
-fn epochs_until_correct(loss: &impl Loss<1>, learning_rate: f32) -> Option<usize> {
+fn epochs_until_correct(loss: &impl Loss, learning_rate: f32) -> Option<usize> {
     let mut net = DenseLayer::new(
         [[0.5, -0.4], [-0.3, 0.6], [0.8, 0.2], [-0.6, -0.7]],
         [0.1, 0.1, -0.1, 0.2],

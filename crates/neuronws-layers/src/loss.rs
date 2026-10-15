@@ -1,29 +1,44 @@
 use crate::scalar::Scalar;
+use crate::values::Values;
 
 /// Eine Verlustfunktion: misst, wie weit die Ausgabe vom Ziel entfernt ist.
 ///
+/// Ausgabe und Ziel dürfen jede Form haben (Vektor, Matrix, Bild, ...), solange beide gleich sind.
+/// Die Verlustfunktion sieht sie als flache Liste von `V::LEN` Zahlen.
+///
 /// `gradient` ist `∂L/∂y` und damit der Startpunkt des Backward-Passes.
-pub trait Loss<const N: usize> {
-    fn value<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> T;
-    fn gradient<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> [T; N];
+pub trait Loss {
+    fn value<T: Scalar, V: Values<T>>(&self, output: &V, target: &V) -> T;
+    fn gradient<T: Scalar, V: Values<T>>(&self, output: &V, target: &V) -> V;
+}
+
+/// Bildet aus jedem Paar `(y[i], t[i])` eine Zahl, in der Reihenfolge von `Values`.
+fn map_pairs<T: Scalar, V: Values<T>>(output: &V, target: &V, mut f: impl FnMut(T, T) -> T) -> V {
+    let mut result = V::zeros();
+    for i in 0..V::LEN {
+        *result.value_mut(i) = f(output.value(i), target.value(i));
+    }
+    result
+}
+
+/// Summe über alle Paare `(y[i], t[i])`.
+fn sum_pairs<T: Scalar, V: Values<T>>(output: &V, target: &V, mut f: impl FnMut(T, T) -> T) -> T {
+    (0..V::LEN).fold(T::ZERO, |sum, i| sum + f(output.value(i), target.value(i)))
 }
 
 /// Mittlerer quadratischer Fehler: `L = (1/N) Σ (y − t)²`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MeanSquaredError;
 
-impl<const N: usize> Loss<N> for MeanSquaredError {
-    fn value<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> T {
-        let sum = output
-            .iter()
-            .zip(target)
-            .fold(T::ZERO, |sum, (&y, &t)| sum + (y - t) * (y - t));
-        sum / T::from_usize(N)
+impl Loss for MeanSquaredError {
+    fn value<T: Scalar, V: Values<T>>(&self, output: &V, target: &V) -> T {
+        sum_pairs(output, target, |y, t| (y - t) * (y - t)) / T::from_usize(V::LEN)
     }
 
     /// `∂L/∂y[i] = 2 (y[i] − t[i]) / N`
-    fn gradient<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> [T; N] {
-        core::array::from_fn(|i| T::TWO * (output[i] - target[i]) / T::from_usize(N))
+    fn gradient<T: Scalar, V: Values<T>>(&self, output: &V, target: &V) -> V {
+        let n = T::from_usize(V::LEN);
+        map_pairs(output, target, |y, t| T::TWO * (y - t) / n)
     }
 }
 
@@ -49,20 +64,21 @@ fn clamp_open_unit<T: Scalar>(y: T) -> T {
 }
 
 #[cfg(any(feature = "std", feature = "libm"))]
-impl<const N: usize> Loss<N> for BinaryCrossEntropy {
-    fn value<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> T {
-        let sum = output.iter().zip(target).fold(T::ZERO, |sum, (&y, &t)| {
+impl Loss for BinaryCrossEntropy {
+    fn value<T: Scalar, V: Values<T>>(&self, output: &V, target: &V) -> T {
+        let sum = sum_pairs(output, target, |y, t| {
             let y = clamp_open_unit(y);
-            sum - (t * y.ln() + (T::ONE - t) * (T::ONE - y).ln())
+            -(t * y.ln() + (T::ONE - t) * (T::ONE - y).ln())
         });
-        sum / T::from_usize(N)
+        sum / T::from_usize(V::LEN)
     }
 
     /// `∂L/∂y[i] = (y[i] − t[i]) / (y[i] (1 − y[i]) N)`
-    fn gradient<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> [T; N] {
-        core::array::from_fn(|i| {
-            let y = clamp_open_unit(output[i]);
-            (y - target[i]) / (y * (T::ONE - y) * T::from_usize(N))
+    fn gradient<T: Scalar, V: Values<T>>(&self, output: &V, target: &V) -> V {
+        let n = T::from_usize(V::LEN);
+        map_pairs(output, target, |y, t| {
+            let y = clamp_open_unit(y);
+            (y - t) / (y * (T::ONE - y) * n)
         })
     }
 }
@@ -85,16 +101,13 @@ fn clamp_positive<T: Scalar>(y: T) -> T {
 }
 
 #[cfg(any(feature = "std", feature = "libm"))]
-impl<const N: usize> Loss<N> for CategoricalCrossEntropy {
-    fn value<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> T {
-        output
-            .iter()
-            .zip(target)
-            .fold(T::ZERO, |sum, (&y, &t)| sum - t * clamp_positive(y).ln())
+impl Loss for CategoricalCrossEntropy {
+    fn value<T: Scalar, V: Values<T>>(&self, output: &V, target: &V) -> T {
+        sum_pairs(output, target, |y, t| -(t * clamp_positive(y).ln()))
     }
 
     /// `∂L/∂y[i] = −t[i] / y[i]`
-    fn gradient<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> [T; N] {
-        core::array::from_fn(|i| -target[i] / clamp_positive(output[i]))
+    fn gradient<T: Scalar, V: Values<T>>(&self, output: &V, target: &V) -> V {
+        map_pairs(output, target, |y, t| -t / clamp_positive(y))
     }
 }

@@ -12,6 +12,7 @@ pub mod loss;
 pub mod neurons;
 pub mod optimizer;
 pub mod random;
+pub mod reshape;
 pub mod scalar;
 pub mod schedule;
 #[cfg(any(feature = "std", feature = "libm"))]

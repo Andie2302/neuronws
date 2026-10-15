@@ -30,8 +30,14 @@ fn linear_f64() {
 #[test]
 fn elementwise_identity_and_relu_away_from_the_kink() {
     let x = [-1.5_f32, 0.7, 2.0, -0.3];
-    assert_gradients_match(&Elementwise::<4, _>::new(Identity), (), x, 1e-2, 2e-3);
-    assert_gradients_match(&Elementwise::<4, _>::new(Relu), (), x, 1e-2, 2e-3);
+    assert_gradients_match(
+        &Elementwise::<[f32; 4], _>::new(Identity),
+        (),
+        x,
+        1e-2,
+        2e-3,
+    );
+    assert_gradients_match(&Elementwise::<[f32; 4], _>::new(Relu), (), x, 1e-2, 2e-3);
 }
 
 #[test]
@@ -78,8 +84,8 @@ mod smooth {
     #[test]
     fn sigmoid_tanh_and_softmax() {
         let x = [0.4_f32, -1.2, 2.0, 0.1];
-        assert_gradients_match(&Elementwise::<4, _>::new(Sigmoid), (), x, 1e-2, 2e-3);
-        assert_gradients_match(&Elementwise::<4, _>::new(Tanh), (), x, 1e-2, 2e-3);
+        assert_gradients_match(&Elementwise::<[f32; 4], _>::new(Sigmoid), (), x, 1e-2, 2e-3);
+        assert_gradients_match(&Elementwise::<[f32; 4], _>::new(Tanh), (), x, 1e-2, 2e-3);
         assert_gradients_match(&Softmax::<4>::new(), (), x, 1e-2, 2e-3);
     }
 

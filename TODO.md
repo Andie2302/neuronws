@@ -43,15 +43,16 @@ Unser Stand ist ein Multi-Layer-Perceptron, der Unterbau ist aber allgemeiner: e
 
 Die drei echten Engstellen:
 
-- [ ] ! **Formen verallgemeinern:** `Trainer`, `train_epoch` und `Loss` kennen nur flache Vektoren (`[T; N]`). Auf `Values` verallgemeinern, damit Bilder und Folgen gehen.
-- [ ] **Tiefere Verschachtelung in `Values`** (Bilder mit Kanälen). Wahrscheinlich per Makro, weil ein allgemeiner `impl` für `[V; N]` mit dem für `[T; N]` überlappt.
+- [x] **Formen verallgemeinern:** `Trainer`, `train_epoch` und `Loss` arbeiten mit beliebigen Formen (`Values`). Ein allgemeiner `impl` für `[V; N]` ging doch, ganz ohne Makro.
+- [ ] `Softmax` und `Standardize` kennen nur Vektoren. Für Bilder auf eine Achse (z. B. Softmax über die Kanäle) verallgemeinern.
+- [ ] `Linear` (Dense) nimmt nur Vektoren. Mit `Reshape` davor und danach ist das kein Hindernis, eine Variante für Matrizen wäre aber bequemer.
 - [ ] **Feste Größen:** Später eventuell eine dynamische Variante hinter dem Feature `alloc`.
 - [ ] Kombinatoren für Verzweigungen: `Residual`, `Fork` (Gradienten der Zweige addieren).
 - [ ] Weg für Zufall in `forward` (Dropout, VAE).
 
 Empfohlene Reihenfolge, falls wir eine andere Netzart bauen wollen:
 
-- [ ] ! Als Nächstes ein **CNN** (zeigt schnell, ob der Entwurf hält), danach ein **RNN** (zeigt, ob „Folge als eine Operation" trägt).
+- [ ] ! Als Nächstes ein **CNN** (Unterbau steht: Formen sind verallgemeinert; fehlen noch Faltungs- und Pooling-Operation) (zeigt schnell, ob der Entwurf hält), danach ein **RNN** (zeigt, ob „Folge als eine Operation" trägt).
 
 ## Bausteine zum Austauschen
 
@@ -113,3 +114,4 @@ Lernraten-Pläne:
 - [x] Optimierer mit Gedächtnis in Form des Netzes (`Trainable::Shape`), kein handgezähltes `P` mehr
 - [x] Momentum, Adam, AdamW
 - [x] `Trainer` (Loss + Optimizer + Batchgröße) und Lernraten-Pläne (`Constant`, `StepDecay`, `LinearDecay`)
+- [x] Beliebige Formen: `Values` für beliebig tief verschachtelte Arrays, `Loss`/`Trainer` für jede Form, `Elementwise` für jede Form, `Reshape` zum Umordnen (z. B. Bild zu Vektor)

@@ -4,6 +4,7 @@ use crate::loss::Loss;
 use crate::optimizer::Optimizer;
 use crate::scalar::Scalar;
 use crate::traits::{BackwardPathMut, ForwardPath, ForwardPathMut, Trainable};
+use crate::values::Values;
 
 /// Eine Runde über alle Beispiele in Mini-Batches. Liefert den mittleren Verlust der Runde.
 ///
@@ -16,20 +17,21 @@ use crate::traits::{BackwardPathMut, ForwardPath, ForwardPathMut, Trainable};
 ///
 /// # Panics
 /// Wenn `batch_size` 0 ist oder `data` leer.
-pub fn train_epoch<M, O, L, T, const IN: usize, const OUT: usize>(
+pub fn train_epoch<M, O, L, T, I, Out>(
     model: &mut M,
     optimizer: &mut O,
     loss: &L,
-    data: &[([T; IN], [T; OUT])],
+    data: &[(I, Out)],
     batch_size: usize,
 ) -> T
 where
     T: Scalar,
-    M: ForwardPathMut<ForwardInput = [T; IN], ForwardOutput = [T; OUT]>
-        + BackwardPathMut<BackwardInput = [T; OUT], BackwardOutput = [T; IN]>
+    Out: Values<T>,
+    M: ForwardPathMut<ForwardInput = I, ForwardOutput = Out>
+        + BackwardPathMut<BackwardInput = Out>
         + Trainable<Scalar = T>,
     O: Optimizer<M>,
-    L: Loss<OUT>,
+    L: Loss,
 {
     assert!(batch_size > 0, "batch_size muss größer als 0 sein");
     assert!(!data.is_empty(), "data darf nicht leer sein");
@@ -50,15 +52,12 @@ where
 ///
 /// # Panics
 /// Wenn `data` leer ist.
-pub fn mean_loss<M, L, T, const IN: usize, const OUT: usize>(
-    model: &M,
-    loss: &L,
-    data: &[([T; IN], [T; OUT])],
-) -> T
+pub fn mean_loss<M, L, T, I, Out>(model: &M, loss: &L, data: &[(I, Out)]) -> T
 where
     T: Scalar,
-    M: ForwardPath<ForwardInput = [T; IN], ForwardOutput = [T; OUT]>,
-    L: Loss<OUT>,
+    Out: Values<T>,
+    M: ForwardPath<ForwardInput = I, ForwardOutput = Out>,
+    L: Loss,
 {
     assert!(!data.is_empty(), "data darf nicht leer sein");
 

@@ -4,6 +4,7 @@ use crate::scalar::Scalar;
 use crate::schedule::Schedule;
 use crate::training::{mean_loss, train_epoch};
 use crate::traits::{BackwardPathMut, ForwardPath, ForwardPathMut, Trainable};
+use crate::values::Values;
 
 /// Bündelt, **wie** gelernt wird: Fehlerfunktion, Optimierer und Batchgröße.
 ///
@@ -75,17 +76,14 @@ impl<L, O> Trainer<L, O> {
     ///
     /// # Panics
     /// Wenn `data` leer ist.
-    pub fn epoch<M, T, const IN: usize, const OUT: usize>(
-        &mut self,
-        model: &mut M,
-        data: &[([T; IN], [T; OUT])],
-    ) -> T
+    pub fn epoch<M, T, I, Out>(&mut self, model: &mut M, data: &[(I, Out)]) -> T
     where
         T: Scalar,
-        M: ForwardPathMut<ForwardInput = [T; IN], ForwardOutput = [T; OUT]>
-            + BackwardPathMut<BackwardInput = [T; OUT], BackwardOutput = [T; IN]>
+        Out: Values<T>,
+        M: ForwardPathMut<ForwardInput = I, ForwardOutput = Out>
+            + BackwardPathMut<BackwardInput = Out>
             + Trainable<Scalar = T>,
-        L: Loss<OUT>,
+        L: Loss,
         O: Optimizer<M>,
     {
         train_epoch(
@@ -101,18 +99,14 @@ impl<L, O> Trainer<L, O> {
     ///
     /// # Panics
     /// Wenn `epochs` 0 ist oder `data` leer.
-    pub fn fit<M, T, const IN: usize, const OUT: usize>(
-        &mut self,
-        model: &mut M,
-        data: &[([T; IN], [T; OUT])],
-        epochs: usize,
-    ) -> T
+    pub fn fit<M, T, I, Out>(&mut self, model: &mut M, data: &[(I, Out)], epochs: usize) -> T
     where
         T: Scalar,
-        M: ForwardPathMut<ForwardInput = [T; IN], ForwardOutput = [T; OUT]>
-            + BackwardPathMut<BackwardInput = [T; OUT], BackwardOutput = [T; IN]>
+        Out: Values<T>,
+        M: ForwardPathMut<ForwardInput = I, ForwardOutput = Out>
+            + BackwardPathMut<BackwardInput = Out>
             + Trainable<Scalar = T>,
-        L: Loss<OUT>,
+        L: Loss,
         O: Optimizer<M>,
     {
         assert!(epochs > 0, "epochs muss größer als 0 sein");
@@ -130,19 +124,20 @@ impl<L, O> Trainer<L, O> {
     ///
     /// # Panics
     /// Wenn `epochs` 0 ist oder `data` leer.
-    pub fn fit_scheduled<M, S, T, const IN: usize, const OUT: usize>(
+    pub fn fit_scheduled<M, S, T, I, Out>(
         &mut self,
         model: &mut M,
-        data: &[([T; IN], [T; OUT])],
+        data: &[(I, Out)],
         epochs: usize,
         schedule: &S,
     ) -> T
     where
         T: Scalar,
-        M: ForwardPathMut<ForwardInput = [T; IN], ForwardOutput = [T; OUT]>
-            + BackwardPathMut<BackwardInput = [T; OUT], BackwardOutput = [T; IN]>
+        Out: Values<T>,
+        M: ForwardPathMut<ForwardInput = I, ForwardOutput = Out>
+            + BackwardPathMut<BackwardInput = Out>
             + Trainable<Scalar = T>,
-        L: Loss<OUT>,
+        L: Loss,
         O: Optimizer<M> + HasLearningRate<T>,
         S: Schedule<T>,
     {
@@ -160,15 +155,12 @@ impl<L, O> Trainer<L, O> {
     ///
     /// # Panics
     /// Wenn `data` leer ist.
-    pub fn evaluate<M, T, const IN: usize, const OUT: usize>(
-        &self,
-        model: &M,
-        data: &[([T; IN], [T; OUT])],
-    ) -> T
+    pub fn evaluate<M, T, I, Out>(&self, model: &M, data: &[(I, Out)]) -> T
     where
         T: Scalar,
-        M: ForwardPath<ForwardInput = [T; IN], ForwardOutput = [T; OUT]>,
-        L: Loss<OUT>,
+        Out: Values<T>,
+        M: ForwardPath<ForwardInput = I, ForwardOutput = Out>,
+        L: Loss,
     {
         mean_loss(model, &self.loss, data)
     }

@@ -81,7 +81,7 @@ fn works_with_f64() {
     assert!((loss - core::f64::consts::LN_2).abs() < 1e-12);
 }
 
-fn epochs_until_correct(loss: &impl Loss<1>) -> Option<usize> {
+fn epochs_until_correct(loss: &impl Loss) -> Option<usize> {
     let data = [
         ([0.0, 0.0], [0.0]),
         ([0.0, 1.0], [1.0]),
