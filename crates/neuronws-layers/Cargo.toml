@@ -23,3 +23,7 @@ required-features = ["libm"]
 [[example]]
 name = "xor_loss_comparison"
 required-features = ["libm"]
+
+[[example]]
+name = "learn_with_trainer"
+required-features = ["libm"]

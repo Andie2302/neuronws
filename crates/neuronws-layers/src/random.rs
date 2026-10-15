@@ -37,4 +37,24 @@ impl Rng {
     pub fn uniform(&mut self, low: f32, high: f32) -> f32 {
         low + (high - low) * self.next_f32()
     }
+
+    /// Gleichverteilt in `0..n`.
+    ///
+    /// # Panics
+    /// Wenn `n` 0 ist oder nicht in ein `u32` passt.
+    pub fn next_below(&mut self, n: usize) -> usize {
+        assert!(
+            n > 0 && u32::try_from(n).is_ok(),
+            "n muss in 1..=u32::MAX liegen"
+        );
+        // Multiplikation statt Rest: Die oberen Bits sind besser verteilt als die unteren.
+        ((u64::from(self.next_u32()) * n as u64) >> 32) as usize
+    }
+
+    /// Mischt die Elemente an Ort und Stelle (Fisher-Yates), ohne zusätzlichen Speicher.
+    pub fn shuffle<X>(&mut self, items: &mut [X]) {
+        for i in (1..items.len()).rev() {
+            items.swap(i, self.next_below(i + 1));
+        }
+    }
 }
