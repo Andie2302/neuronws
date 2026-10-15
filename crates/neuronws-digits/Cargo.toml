@@ -1,0 +1,7 @@
+[package]
+name = "neuronws-digits"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+neuronws-layers = { path = "../neuronws-layers", features = ["libm"] }
