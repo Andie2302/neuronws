@@ -37,5 +37,23 @@ cargo test --workspace --quiet
 if [ "$mode" != "quick" ]; then
     echo "== Dokumentation ohne Warnungen"
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --quiet
+
+    # Der eigentliche Beweis für `no_std` ohne `alloc`: ein Ziel ohne Betriebssystem. Dort gibt es
+    # weder `std` noch einen Heap, jede versehentliche Benutzung wäre ein Fehler.
+    target="thumbv7em-none-eabihf"
+    if ! rustup target list --installed | grep -qx "$target"; then
+        echo "== Ziel $target installieren"
+        rustup target add "$target"
+    fi
+    for features in "" "libm" "alloc" "alloc,libm"; do
+        flags=(--no-default-features)
+        [ -n "$features" ] && flags+=(--features "$features")
+        echo "== Bare-Metal-Build neuronws-layers (${features:-keine Features})"
+        cargo build -p neuronws-layers "${flags[@]}" --target "$target" --quiet
+    done
+    echo "== Bare-Metal-Build neuronws-perceptrons und neuronws-digits"
+    cargo build -p neuronws-perceptrons --target "$target" --quiet
+    cargo build -p neuronws-digits --no-default-features --target "$target" --quiet
+    cargo build -p neuronws-digits --target "$target" --quiet
 fi
 echo "Alles in Ordnung."

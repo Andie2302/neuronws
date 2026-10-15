@@ -31,6 +31,7 @@ pub mod neurons;
 #[cfg(any(feature = "std", feature = "libm"))]
 pub mod norm;
 pub mod optimizer;
+pub mod persist;
 pub mod pooling;
 pub mod random;
 pub mod recurrent;
