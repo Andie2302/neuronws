@@ -3,4 +3,15 @@ name = "neuronws-layers"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+# Mathe-Funktionen wie `exp` kommen aus `std`, oder ohne `std` aus `libm`.
+std = []
+libm = ["dep:libm"]
+
 [dependencies]
+libm = { version = "0.2", optional = true }
+
+[[example]]
+name = "learn_xor_sigmoid"
+required-features = ["libm"]

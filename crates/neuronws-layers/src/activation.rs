@@ -48,3 +48,41 @@ impl Activation for Relu {
         if z > 0.0 { 1.0 } else { 0.0 }
     }
 }
+
+/// φ(z) = 1 / (1 + e^(−z)), drückt alle Werte in den Bereich (0, 1).
+///
+/// Braucht `exp`, deshalb nur mit dem Feature `std` oder `libm`.
+#[cfg(any(feature = "std", feature = "libm"))]
+pub struct Sigmoid;
+
+#[cfg(any(feature = "std", feature = "libm"))]
+impl Activation for Sigmoid {
+    fn apply(&self, z: f32) -> f32 {
+        1.0 / (1.0 + crate::math::exp(-z))
+    }
+
+    /// φ'(z) = φ(z) · (1 − φ(z))
+    fn derivative(&self, z: f32) -> f32 {
+        let y = self.apply(z);
+        y * (1.0 - y)
+    }
+}
+
+/// φ(z) = tanh(z), drückt alle Werte in den Bereich (−1, 1).
+///
+/// Braucht `tanh`, deshalb nur mit dem Feature `std` oder `libm`.
+#[cfg(any(feature = "std", feature = "libm"))]
+pub struct Tanh;
+
+#[cfg(any(feature = "std", feature = "libm"))]
+impl Activation for Tanh {
+    fn apply(&self, z: f32) -> f32 {
+        crate::math::tanh(z)
+    }
+
+    /// φ'(z) = 1 − tanh²(z)
+    fn derivative(&self, z: f32) -> f32 {
+        let y = self.apply(z);
+        1.0 - y * y
+    }
+}
