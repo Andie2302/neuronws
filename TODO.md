@@ -24,6 +24,35 @@ Alles, was wir noch umsetzen wollen oder könnten. Neue Ideen einfach unten in d
 - [ ] Faltungsschicht (Convolution) und Pooling
 - [ ] Einbettungen (Embedding) und Rekurrente Zellen (RNN/GRU/LSTM), falls wir je Folgen verarbeiten wollen
 
+## Andere Netzarten
+
+Unser Stand ist ein Multi-Layer-Perceptron, der Unterbau ist aber allgemeiner: eine Kette von Rechenschritten (`Operation`) mit handgeschriebener Rückwärtsrechnung. Die Einschätzungen stammen aus dem Entwurf, nichts davon ist ausprobiert.
+
+| Netzart | Passt? | Was nötig wäre |
+|---|---|---|
+| Autoencoder | ja | Nichts, das Ziel ist die Eingabe. |
+| RBF-Netze | ja | Nur eine neue `Operation` (Abstand zu Zentren). |
+| CNN (Faltung, Pooling) | fast | Neue Operationen. `Values` kann bisher nur Vektoren und Matrizen, für Bilder mit Kanälen braucht es tiefere Verschachtelung. Wegen fester Größen muss die Ausgabegröße als eigene Zahl angegeben werden. |
+| RNN / LSTM / GRU | mit Kniff | Die ganze Folge als eine Operation mit fester Länge (`[[T; D]; STEPS]`), die Rückwärtsrechnung über die Zeit steckt in `backward`. Variable Längen ohne `alloc` nur mit Auffüllen. |
+| Transformer / Attention | mit Kniff | Auch eine Operation auf einer Folge, dazu Residual-Verbindungen und Layer-Norm. |
+| ResNet, U-Net | Umbau am Rand | `Chain` kann nur geradeaus. Kombinatoren wie `Residual` und `Fork` nötig, der Kern bleibt unberührt. |
+| Dropout, VAE | kleiner Umbau | `forward` bekommt keinen Zufall. Weg finden, einen `Rng` oder Zustand hineinzugeben. |
+| GAN | Trainingsschleife neu | Zwei Netze mit je eigenem Optimierer (passt zu Option A), aber der `Trainer` kann es nicht. |
+| Reinforcement Learning (DQN) | fast | Ringpuffer fester Größe, Loss der nur eine Aktion zählt, Parameter in ein Zielnetz kopieren. |
+| SOM, Hopfield, Boltzmann-Maschinen | andere Welt | Lernen ohne Gradienten. `Loss`, `backward`, `Optimizer` passen nicht. Die getrennten Capability-Traits erlauben es trotzdem: nur `Layer` und `ForwardPath` plus ein eigenes Lern-Trait. |
+
+Die drei echten Engstellen:
+
+- [ ] ! **Formen verallgemeinern:** `Trainer`, `train_epoch` und `Loss` kennen nur flache Vektoren (`[T; N]`). Auf `Values` verallgemeinern, damit Bilder und Folgen gehen.
+- [ ] **Tiefere Verschachtelung in `Values`** (Bilder mit Kanälen). Wahrscheinlich per Makro, weil ein allgemeiner `impl` für `[V; N]` mit dem für `[T; N]` überlappt.
+- [ ] **Feste Größen:** Später eventuell eine dynamische Variante hinter dem Feature `alloc`.
+- [ ] Kombinatoren für Verzweigungen: `Residual`, `Fork` (Gradienten der Zweige addieren).
+- [ ] Weg für Zufall in `forward` (Dropout, VAE).
+
+Empfohlene Reihenfolge, falls wir eine andere Netzart bauen wollen:
+
+- [ ] ! Als Nächstes ein **CNN** (zeigt schnell, ob der Entwurf hält), danach ein **RNN** (zeigt, ob „Folge als eine Operation" trägt).
+
 ## Bausteine zum Austauschen
 
 Aktivierungsfunktionen:
