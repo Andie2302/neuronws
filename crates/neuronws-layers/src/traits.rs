@@ -32,6 +32,9 @@ pub trait BackwardPathMut: BackwardData {
 pub trait Trainable {
     type Scalar;
 
+    /// Anzahl der lernbaren Parameter, so viele ruft `visit_parameters` auf.
+    const PARAMETER_COUNT: usize;
+
     fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut Self::Scalar, Self::Scalar));
 
     /// Setzt alle aufsummierten Gradienten auf 0 zurück.

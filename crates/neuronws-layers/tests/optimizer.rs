@@ -107,14 +107,14 @@ fn momentum_converges_in_fewer_rounds_than_sgd() {
 }
 
 #[test]
-#[should_panic(expected = "mehr als 1 Parameter")]
+#[should_panic(expected = "Momentum<1> passt nicht zu einem Modell mit 2 Parametern")]
 fn momentum_panics_when_p_is_too_small() {
     let mut layer = DenseLayer::new([[1.0]], [0.0]);
     Momentum::<1>::new(0.1, 0.9).step(&mut layer, 1);
 }
 
 #[test]
-#[should_panic(expected = "hat 2 Parameter")]
+#[should_panic(expected = "Momentum<3> passt nicht zu einem Modell mit 2 Parametern")]
 fn momentum_panics_when_p_is_too_large() {
     let mut layer = DenseLayer::new([[1.0]], [0.0]);
     Momentum::<3>::new(0.1, 0.9).step(&mut layer, 1);
@@ -130,4 +130,16 @@ fn trainable_still_reports_parameters_in_a_stable_order() {
         i += 1;
     });
     assert_eq!(seen, [1.0, 2.0, 3.0]); // erst die Gewichte, dann der Bias
+}
+
+#[test]
+fn a_wrong_p_leaves_the_model_untouched() {
+    let mut layer = DenseLayer::new([[1.0]], [0.0]);
+    one_gradient_step(&mut layer);
+    let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
+        Momentum::<3>::new(0.1, 0.9).step(&mut layer, 1);
+    }));
+    assert!(result.is_err());
+    assert_eq!(layer.weights(), &[[1.0]]);
+    assert_eq!(layer.bias(), &[0.0]);
 }

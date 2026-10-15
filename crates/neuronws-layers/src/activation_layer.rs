@@ -70,6 +70,8 @@ impl<const N: usize, A: Activation, T: Scalar> BackwardPathMut for ActivationLay
 impl<const N: usize, A: Activation, T: Scalar> Trainable for ActivationLayer<N, A, T> {
     type Scalar = T;
 
+    const PARAMETER_COUNT: usize = 0;
+
     fn visit_parameters(&mut self, _visitor: &mut impl FnMut(&mut T, T)) {}
 
     fn zero_grad(&mut self) {}

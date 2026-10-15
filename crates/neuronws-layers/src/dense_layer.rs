@@ -124,6 +124,8 @@ impl<const IN: usize, const OUT: usize, T: Scalar> BackwardPathMut for DenseLaye
 impl<const IN: usize, const OUT: usize, T: Scalar> Trainable for DenseLayer<IN, OUT, T> {
     type Scalar = T;
 
+    const PARAMETER_COUNT: usize = IN * OUT + OUT;
+
     fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut T, T)) {
         for (row, grad_row) in self.weights.iter_mut().zip(&self.grad_weights) {
             for (w, &g) in row.iter_mut().zip(grad_row) {

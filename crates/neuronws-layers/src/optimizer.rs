@@ -34,8 +34,23 @@ impl<T: Scalar> Optimizer<T> for Sgd<T> {
 /// Jeder Parameter merkt sich seine bisherige "Geschwindigkeit" `v`. Das glättet Zickzack-Wege
 /// und beschleunigt das Lernen in Richtungen, in denen der Gradient immer gleich zeigt.
 ///
-/// `P` ist die Anzahl der Parameter des Modells. Die Parameter werden in einer festen
-/// Reihenfolge besucht, und `velocity[i]` gehört zum `i`-ten.
+/// `P` ist die Anzahl der Parameter des Modells, also `<Modell as Trainable>::PARAMETER_COUNT`.
+/// Die Parameter werden in einer festen Reihenfolge besucht, und `velocity[i]` gehört zum `i`-ten.
+///
+/// ```
+/// use neuronws_layers::activation::Relu;
+/// use neuronws_layers::activation_layer::ActivationLayer;
+/// use neuronws_layers::chain::Chain;
+/// use neuronws_layers::dense_layer::DenseLayer;
+/// use neuronws_layers::optimizer::Momentum;
+/// use neuronws_layers::traits::Trainable;
+///
+/// type Net = Chain<DenseLayer<2, 3>, Chain<ActivationLayer<3, Relu>, DenseLayer<3, 1>>>;
+/// const P: usize = <Net as Trainable>::PARAMETER_COUNT; // 2*3 + 3 + 0 + 3*1 + 1 = 13
+///
+/// let _momentum = Momentum::<P>::new(0.01, 0.9);
+/// assert_eq!(P, 13);
+/// ```
 pub struct Momentum<const P: usize, T: Scalar = f32> {
     learning_rate: T,
     momentum: T,
@@ -54,24 +69,26 @@ impl<const P: usize, T: Scalar> Momentum<P, T> {
 
 impl<const P: usize, T: Scalar> Optimizer<T> for Momentum<P, T> {
     /// # Panics
-    /// Wenn `P` nicht der Anzahl der Parameter des Modells entspricht.
+    /// Wenn `P` nicht der Anzahl der Parameter des Modells entspricht. Das wird vor dem ersten
+    /// Schritt geprüft, es wird also nie ein Teil der Parameter geändert.
     fn step<M: Trainable<Scalar = T>>(&mut self, model: &mut M, batch_size: usize) {
+        assert_eq!(
+            M::PARAMETER_COUNT,
+            P,
+            "Momentum<{P}> passt nicht zu einem Modell mit {} Parametern",
+            M::PARAMETER_COUNT
+        );
         let scale = self.learning_rate / T::from_usize(batch_size);
         let momentum = self.momentum;
         let velocity = &mut self.velocity;
-        let mut count = 0;
+        let mut index = 0;
 
         model.visit_parameters(&mut |parameter, gradient| {
-            assert!(
-                count < P,
-                "Momentum<{P}>: das Modell hat mehr als {P} Parameter"
-            );
-            velocity[count] = momentum * velocity[count] - scale * gradient;
-            *parameter += velocity[count];
-            count += 1;
+            velocity[index] = momentum * velocity[index] - scale * gradient;
+            *parameter += velocity[index];
+            index += 1;
         });
 
-        assert_eq!(count, P, "Momentum<{P}>: das Modell hat {count} Parameter");
         model.zero_grad();
     }
 }
