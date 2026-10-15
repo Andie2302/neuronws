@@ -2,7 +2,7 @@
 
 use neuronws_layers::activation::{Activation, Step};
 use neuronws_layers::dense_layer::DenseLayer;
-use neuronws_layers::optimizer::Sgd;
+use neuronws_layers::optimizer::{Optimizer, Sgd};
 use neuronws_layers::scalar::Scalar;
 use neuronws_layers::traits::{BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer};
 

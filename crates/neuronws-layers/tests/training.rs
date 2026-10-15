@@ -5,7 +5,7 @@ use neuronws_layers::activation_layer::ActivationLayer;
 use neuronws_layers::chain::LayerExt;
 use neuronws_layers::dense_layer::DenseLayer;
 use neuronws_layers::loss::{Loss, MeanSquaredError};
-use neuronws_layers::optimizer::Sgd;
+use neuronws_layers::optimizer::{Optimizer, Sgd};
 use neuronws_layers::traits::{BackwardPathMut, ForwardPath, ForwardPathMut};
 
 #[test]
@@ -25,7 +25,7 @@ fn sgd_step_moves_parameters_against_the_gradient_and_clears_it() {
 #[test]
 fn dense_layer_learns_a_line() {
     let mut layer = DenseLayer::<1, 1, f32>::new([[0.0]], [0.0]);
-    let sgd = Sgd::new(0.05);
+    let mut sgd = Sgd::new(0.05);
     let data = [-2.0, -1.0, 0.0, 1.0, 2.0].map(|x| ([x], [2.0 * x + 1.0]));
 
     for _ in 0..300 {
@@ -52,7 +52,7 @@ fn network_learns_xor() {
     )
     .then(ActivationLayer::<4, _>::new(Relu))
     .then(DenseLayer::new([[0.5, -0.5, 0.3, -0.2]], [0.0]));
-    let sgd = Sgd::new(0.05);
+    let mut sgd = Sgd::new(0.05);
     let data = [
         ([0.0, 0.0], [0.0]),
         ([0.0, 1.0], [1.0]),

@@ -9,7 +9,7 @@ use neuronws_layers::activation_layer::ActivationLayer;
 use neuronws_layers::chain::LayerExt;
 use neuronws_layers::dense_layer::DenseLayer;
 use neuronws_layers::loss::{Loss, MeanSquaredError};
-use neuronws_layers::optimizer::Sgd;
+use neuronws_layers::optimizer::{Optimizer, Sgd};
 use neuronws_layers::traits::{BackwardPathMut, ForwardPathMut};
 
 fn main() {
@@ -22,7 +22,7 @@ fn main() {
     .then(ActivationLayer::<4, _>::new(Relu))
     .then(DenseLayer::new([[0.5, -0.5, 0.3, -0.2]], [0.0]));
 
-    let sgd = Sgd::new(0.05);
+    let mut sgd = Sgd::new(0.05);
     let data = [
         ([0.0, 0.0], [0.0]),
         ([0.0, 1.0], [1.0]),
