@@ -1,8 +1,5 @@
 use crate::traits::{Data, ForwardData, ForwardPath, Layer};
 
-/// Voll verbundene Schicht: `OUT` Neuronen, die alle `IN` Eingänge sehen.
-///
-/// `weights[j]` ist die Gewichtszeile des Neurons `j`.
 pub struct DenseLayer<const IN: usize, const OUT: usize> {
     weights: [[f32; IN]; OUT],
     bias: [f32; OUT],
