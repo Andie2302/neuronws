@@ -14,6 +14,10 @@ default = []
 # und bekommt dieselben Ergebnisse.
 std = []
 libm = ["dep:libm"]
+# Alles, was den Heap braucht, steckt hinter diesem Feature (zum Beispiel `Box<M>` als Schicht, damit
+# große Netze nicht auf dem Stack liegen). Ohne das Feature braucht die Bibliothek weder `alloc` noch
+# `std`.
+alloc = []
 
 [dependencies]
 libm = { workspace = true, optional = true }

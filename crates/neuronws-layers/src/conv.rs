@@ -179,9 +179,7 @@ impl<
     fn init_params<I: Initializer>(&self, initializer: &I, rng: &mut Rng) -> Self::Params {
         let (fan_in, fan_out) = (C_IN * KH * KW, C_OUT * KH * KW);
         let mut kernels = <Kernels<C_OUT, C_IN, KH, KW, T> as Values<T>>::zeros();
-        for index in 0..<Kernels<C_OUT, C_IN, KH, KW, T> as Values<T>>::LEN {
-            *kernels.value_mut(index) = initializer.sample(rng, fan_in, fan_out);
-        }
+        initializer.fill(rng, &mut kernels, fan_in, fan_out);
         (kernels, [T::ZERO; C_OUT])
     }
 }

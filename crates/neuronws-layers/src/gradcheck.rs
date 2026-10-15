@@ -1,4 +1,5 @@
-//! Prüft die Ableitung einer [`Operation`] gegen numerische Ableitungen.
+//! Prüft Ableitungen gegen numerische Ableitungen: von einer [`Operation`], einer [`Activation`]
+//! und einer [`Loss`]-Funktion.
 //!
 //! Wer eine neue Operation schreibt, kann damit beweisen, dass sein `backward` stimmt:
 //!
@@ -11,7 +12,9 @@
 //! assert_gradients_match(&Linear::<2, 2>::new(), params, [1.5, -0.5], 1e-2, 1e-3);
 //! ```
 
+use crate::activation::Activation;
 use crate::block::Operation;
+use crate::loss::Loss;
 use crate::scalar::Scalar;
 use crate::values::Values;
 
@@ -68,5 +71,59 @@ pub fn assert_gradients_match<Op: Operation>(
         *down.value_mut(index) -= epsilon;
         let numeric = (loss(&up, &input) - loss(&down, &input)) / two_eps;
         check("Parameter", index, grads.value(index), numeric);
+    }
+}
+
+/// Prüft `derivative` und `derivative_with_output` einer [`Activation`] an den gegebenen Stellen
+/// gegen die numerische Ableitung `(φ(z + h) − φ(z − h)) / 2h` (gerechnet mit `f64`).
+///
+/// Stellen mit Knick (bei ReLU die 0) sollten nicht dabei sein, dort ist die Ableitung nicht
+/// definiert.
+///
+/// # Panics
+/// Wenn eine Ableitung um mehr als `tolerance · (1 + |Wert|)` abweicht, mit der Angabe, wo.
+pub fn assert_activation_matches<A: Activation>(activation: &A, points: &[f64], tolerance: f64) {
+    let h = 1e-6;
+    for &z in points {
+        let phi = |x: f64| activation.apply(x);
+        let numeric = (phi(z + h) - phi(z - h)) / (2.0 * h);
+        let allowed = tolerance * (1.0 + numeric.abs());
+        let analytic = activation.derivative(z);
+        assert!(
+            (analytic - numeric).abs() <= allowed,
+            "φ'({z}): analytisch {analytic}, numerisch {numeric}"
+        );
+        let with_output = activation.derivative_with_output(z, phi(z));
+        assert!(
+            (with_output - numeric).abs() <= allowed,
+            "φ'({z}) mit bekanntem Ergebnis: {with_output}, numerisch {numeric}"
+        );
+    }
+}
+
+/// Prüft `Loss::gradient` gegen die numerische Ableitung von `Loss::value` nach jeder Ausgabe.
+///
+/// # Panics
+/// Wenn ein Gradient um mehr als `tolerance · (1 + |Wert|)` abweicht, mit der Angabe, welcher.
+pub fn assert_loss_gradient_matches<T: Scalar, V: Values<T>, L: Loss>(
+    loss: &L,
+    output: V,
+    target: V,
+    epsilon: T,
+    tolerance: f64,
+) {
+    let gradient = loss.gradient(&output, &target);
+    let two_eps = T::TWO * epsilon;
+    for index in 0..V::LEN {
+        let (mut up, mut down) = (output, output);
+        *up.value_mut(index) += epsilon;
+        *down.value_mut(index) -= epsilon;
+        let numeric = (loss.value(&up, &target) - loss.value(&down, &target)) / two_eps;
+        let (a, n) = (gradient.value(index).to_f64(), numeric.to_f64());
+        let allowed = tolerance * (1.0 + a.abs().max(n.abs()));
+        assert!(
+            (a - n).abs() <= allowed,
+            "Ableitung nach Ausgabe[{index}]: analytisch {a}, numerisch {n}"
+        );
     }
 }

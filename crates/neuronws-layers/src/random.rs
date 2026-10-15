@@ -1,3 +1,6 @@
+#[cfg(any(feature = "std", feature = "libm"))]
+use crate::scalar::Scalar;
+
 /// Ein kleiner Zufallsgenerator (xorshift64*) ohne Abhängigkeiten.
 ///
 /// Er ist deterministisch: derselbe Startwert (`seed`) liefert immer dieselbe Folge.
@@ -5,6 +8,10 @@
 #[derive(Debug, Clone)]
 pub struct Rng {
     state: u64,
+    /// Das Box-Muller-Verfahren liefert zwei normalverteilte Zahlen auf einmal. Die zweite wartet
+    /// hier auf den nächsten Aufruf von `next_normal`. Gibt es nur, wo `next_normal` es gibt.
+    #[cfg(any(feature = "std", feature = "libm"))]
+    spare_normal: Option<f32>,
 }
 
 impl Rng {
@@ -17,6 +24,8 @@ impl Rng {
         // xorshift bleibt bei 0 für immer bei 0
         Self {
             state: if z == 0 { 0x9E37_79B9_7F4A_7C15 } else { z },
+            #[cfg(any(feature = "std", feature = "libm"))]
+            spare_normal: None,
         }
     }
 
@@ -32,6 +41,27 @@ impl Rng {
     /// Gleichverteilt in `[0, 1)`. Die oberen 24 Bit passen genau in die Mantisse eines `f32`.
     pub fn next_f32(&mut self) -> f32 {
         (self.next_u32() >> 8) as f32 / 16_777_216.0
+    }
+
+    /// Normalverteilt mit Mittelwert 0 und Streuung 1 (Box-Muller-Verfahren).
+    ///
+    /// Aus zwei gleichverteilten Zahlen `u₁, u₂` entstehen zwei unabhängige normalverteilte:
+    /// `√(−2 ln u₁) · cos(2π u₂)` und `√(−2 ln u₁) · sin(2π u₂)`. Die zweite wird für den
+    /// nächsten Aufruf aufgehoben. Braucht `ln`, `sqrt`, `cos` und `sin`, deshalb nur mit dem
+    /// Feature `std` oder `libm`.
+    #[cfg(any(feature = "std", feature = "libm"))]
+    pub fn next_normal(&mut self) -> f32 {
+        if let Some(spare) = self.spare_normal.take() {
+            return spare;
+        }
+        // `1 − u` liegt in (0, 1], damit `ln` endlich bleibt. Die Aufrufe gehen absichtlich über
+        // `Scalar`, damit bei `std` und `libm` zusammen immer `libm` gewinnt.
+        let u1 = 1.0 - self.next_f32();
+        let u2 = self.next_f32();
+        let radius = <f32 as Scalar>::sqrt(-2.0 * <f32 as Scalar>::ln(u1));
+        let angle = core::f32::consts::TAU * u2;
+        self.spare_normal = Some(radius * <f32 as Scalar>::sin(angle));
+        radius * <f32 as Scalar>::cos(angle)
     }
 
     /// Gleichverteilt in `[low, high)`.

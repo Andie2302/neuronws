@@ -26,7 +26,7 @@ impl<const IN: usize, const OUT: usize, T: Scalar> Operation for Linear<IN, OUT,
     type Output = [T; OUT];
     type Params = ([[T; IN]; OUT], [T; OUT]);
 
-    /// y[j] = Σ_i W[j][i] * x[i] + b[j]
+    /// `y[j] = Σ_i W[j][i] * x[i] + b[j]`
     fn forward(&self, (weights, bias): &Self::Params, input: &Self::Input) -> Self::Output {
         core::array::from_fn(|j| {
             let dot = weights[j]
@@ -63,8 +63,8 @@ impl<const IN: usize, const OUT: usize, T: Scalar> Operation for Linear<IN, OUT,
 
     /// Gewichte aus dem `Initializer`, Bias 0.
     fn init_params<I: Initializer>(&self, initializer: &I, rng: &mut Rng) -> Self::Params {
-        let weights =
-            core::array::from_fn(|_| core::array::from_fn(|_| initializer.sample(rng, IN, OUT)));
+        let mut weights = [[T::ZERO; IN]; OUT];
+        initializer.fill(rng, &mut weights, IN, OUT);
         (weights, [T::ZERO; OUT])
     }
 }

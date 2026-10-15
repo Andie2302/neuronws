@@ -1,9 +1,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 pub mod activation;
 pub mod activation_layer;
 #[cfg(any(feature = "std", feature = "libm"))]
 pub mod adam;
 pub mod block;
+#[cfg(feature = "alloc")]
+pub mod boxed;
 pub mod chain;
 pub mod conv;
 pub mod dense_layer;
