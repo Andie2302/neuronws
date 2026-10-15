@@ -13,8 +13,8 @@ unter **Entscheidungen** (ausführlicher in der [README](README.md)).
 ## Offen
 
 - [ ] ! **Auf einem echten Mikrocontroller ausprobieren.** Das Testprogramm in [`mcu/`](mcu/README.md)
-  läuft im Emulator QEMU auf einem Cortex-M4F (ohne Betriebssystem, `std` und `alloc`, Ergebnis bitgleich
-  zum Rechner), aber auf echter Hardware noch nicht. Dafür fehlt ein Gerät. Was zu tun ist, steht in
+  läuft im Emulator QEMU auf einem Cortex-M4F und einem Cortex-M3 (ohne Betriebssystem, `std` und `alloc`,
+  Ergebnis bitgleich zum Rechner), aber auf echter Hardware noch nicht. Dafür fehlt ein Gerät. Was zu tun ist, steht in
   `mcu/README.md`, Abschnitt "Auf einen echten Chip übertragen". **Bitte hier eintragen:** Chip, Takt und
   die Zeile `Flash belegt ... Stack benutzt ...` aus der Ausgabe.
 - [ ] **CI auf GitHub ansehen.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ist geschrieben
@@ -144,7 +144,8 @@ Praxis:
   Optimierer.
 - [x] **Benchmarks** SGD gegen Momentum gegen Adam und weitere auf mehreren Aufgaben
   (`optimizer_comparison`).
-- [x] Mikrocontroller: Programm und Emulator-Test sind da, die echte Hardware steht noch offen (siehe oben).
+- [x] Mikrocontroller: Programm und Emulator-Test (Cortex-M4F und Cortex-M3) sind da, die Bibliothek wird
+  außerdem für Cortex-M0/M0+ und RISC-V gebaut. Die echte Hardware steht noch offen (siehe oben).
 
 Perceptron:
 

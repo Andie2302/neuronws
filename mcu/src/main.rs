@@ -1,7 +1,8 @@
 //! Läuft die Bibliothek wirklich ohne Betriebssystem? Dieses Programm tut es: Es lernt XOR, speichert
 //! und lädt die Gewichte, prüft ein Perceptron und misst, wie viel Stack und Flash dafür nötig sind.
-//! Alles auf einem Cortex-M4F mit Fließkommaeinheit (`thumbv7em-none-eabihf`), ohne `std` und
-//! ohne `alloc`.
+//! Alles ohne `std` und ohne `alloc`, auf einem Cortex-M4F mit Fließkommaeinheit
+//! (`thumbv7em-none-eabihf`) oder auf einem Cortex-M3 ohne sie (`thumbv7m-none-eabi`, der Compiler
+//! rechnet dort in Software).
 //!
 //! Gestartet wird es im Emulator QEMU (siehe `README.md`). Die Ausgabe geht über "Semihosting":
 //! Das Programm ruft den Debugger, hier QEMU, mit einem `bkpt`-Befehl, und der schreibt den Text
@@ -143,7 +144,9 @@ extern "C" fn fault() -> ! {
 pub extern "C" fn reset() -> ! {
     // Ohne diesen Schritt löst jeder Fließkomma-Befehl eine Ausnahme aus: Das Register CPACR
     // (Coprocessor Access Control, Adresse 0xE000ED88) gibt die Fließkommaeinheit (Coprozessoren
-    // 10 und 11) erst frei, wenn man es beschreibt.
+    // 10 und 11) erst frei, wenn man es beschreibt. Ein Cortex-M3 hat keine (Ziel `eabi` statt
+    // `eabihf`), dort rechnet der Compiler in Software und das Register gibt es nicht.
+    #[cfg(target_abi = "eabihf")]
     // SAFETY: Das ist ein Register des Prozessorkerns, das auf jedem Cortex-M4F an dieser Adresse
     // liegt. Dies ist der erste Code nach dem Einschalten, es läuft nichts anderes.
     unsafe {
@@ -238,7 +241,12 @@ fn run() -> bool {
     paint_stack();
     let mut report = Report { failed: 0 };
 
-    println!("neuronws auf einem Cortex-M4F: ohne Betriebssystem, ohne std, ohne alloc");
+    println!("neuronws ohne Betriebssystem, ohne std, ohne alloc");
+    if cfg!(target_abi = "eabihf") {
+        println!("Ziel: thumbv7em-none-eabihf (Cortex-M4F, Fließkomma in der Hardware)");
+    } else {
+        println!("Ziel: thumbv7m-none-eabi (Cortex-M3, Fließkomma in Software)");
+    }
 
     // 1. Lernen: dasselbe wie im Beispiel `quickstart` (Fehler 0.831 -> 0.001), hier ohne
     //    Betriebssystem.

@@ -45,23 +45,29 @@ if [ "$mode" != "quick" ]; then
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --quiet
     RUSTDOCFLAGS="-D warnings" cargo doc -p neuronws-digits --no-default-features --no-deps --quiet
 
-    # Der eigentliche Beweis für `no_std` ohne `alloc`: ein Ziel ohne Betriebssystem. Dort gibt es
-    # weder `std` noch einen Heap, jede versehentliche Benutzung wäre ein Fehler.
-    target="thumbv7em-none-eabihf"
-    if ! rustup target list --installed | grep -qx "$target"; then
-        echo "== Ziel $target installieren"
-        rustup target add "$target"
-    fi
-    for features in "" "libm" "alloc" "alloc,libm"; do
-        flags=(--no-default-features)
-        [ -n "$features" ] && flags+=(--features "$features")
-        echo "== Bare-Metal-Build neuronws-layers (${features:-keine Features})"
-        cargo build -p neuronws-layers "${flags[@]}" --target "$target" --quiet
+    # Der eigentliche Beweis für `no_std` ohne `alloc`: Ziele ohne Betriebssystem. Dort gibt es
+    # weder `std` noch einen Heap, jede versehentliche Benutzung wäre ein Fehler. Gebaut wird für
+    # vier Prozessoren mit ganz verschiedenen Eigenschaften:
+    #   thumbv7em-none-eabihf         Cortex-M4F/M7F, Fließkommaeinheit
+    #   thumbv7m-none-eabi            Cortex-M3, keine Fließkommaeinheit
+    #   thumbv6m-none-eabi            Cortex-M0/M0+ (zum Beispiel RP2040), kleinster Befehlssatz
+    #   riscv32imc-unknown-none-elf   RISC-V, eine ganz andere Architektur
+    for target in thumbv7em-none-eabihf thumbv7m-none-eabi thumbv6m-none-eabi riscv32imc-unknown-none-elf; do
+        if ! rustup target list --installed | grep -qx "$target"; then
+            echo "== Ziel $target installieren"
+            rustup target add "$target"
+        fi
+        for features in "" "libm" "alloc" "alloc,libm"; do
+            flags=(--no-default-features)
+            [ -n "$features" ] && flags+=(--features "$features")
+            echo "== Bare-Metal-Build $target: neuronws-layers (${features:-keine Features})"
+            cargo build -p neuronws-layers "${flags[@]}" --target "$target" --quiet
+        done
+        echo "== Bare-Metal-Build $target: neuronws-perceptrons und neuronws-digits"
+        cargo build -p neuronws-perceptrons --target "$target" --quiet
+        cargo build -p neuronws-digits --no-default-features --target "$target" --quiet
+        cargo build -p neuronws-digits --target "$target" --quiet
     done
-    echo "== Bare-Metal-Build neuronws-perceptrons und neuronws-digits"
-    cargo build -p neuronws-perceptrons --target "$target" --quiet
-    cargo build -p neuronws-digits --no-default-features --target "$target" --quiet
-    cargo build -p neuronws-digits --target "$target" --quiet
 
     scripts/examples.sh
 

@@ -19,7 +19,7 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Rust installieren
         run: rustup toolchain install stable --profile minimal --component rustfmt && rustup default stable
       - run: cargo fmt --all -- --check
@@ -33,7 +33,7 @@ jobs:
       matrix:
         features: ["", "std", "libm", "std,libm", "alloc", "alloc,std,libm"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Rust installieren
         run: rustup toolchain install stable --profile minimal --component clippy && rustup default stable
       - name: Clippy
@@ -45,7 +45,7 @@ jobs:
     name: Perceptron, Ziffern und Beispiele
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Rust installieren
         run: rustup toolchain install stable --profile minimal --component clippy && rustup default stable
       - run: cargo clippy --workspace --all-targets -- -D warnings
@@ -57,7 +57,7 @@ jobs:
     name: Dokumentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Rust installieren
         run: rustup toolchain install stable --profile minimal && rustup default stable
       # Verweise auf Typen, die es ohne ein Feature nicht gibt, sind ein Fehler. Deshalb wird die
@@ -73,36 +73,44 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
-  # Der eigentliche Beweis für `no_std` ohne `alloc`: ein Ziel ohne Betriebssystem. Dort gibt es
-  # weder `std` noch einen Heap, jede versehentliche Benutzung wäre ein Fehler.
+  # Der eigentliche Beweis für `no_std` ohne `alloc`: Ziele ohne Betriebssystem. Dort gibt es
+  # weder `std` noch einen Heap, jede versehentliche Benutzung wäre ein Fehler. Gebaut wird für vier
+  # Prozessoren mit ganz verschiedenen Eigenschaften: Cortex-M4F (Fließkommaeinheit), Cortex-M3
+  # (keine), Cortex-M0/M0+ (kleinster Befehlssatz, zum Beispiel RP2040) und RISC-V.
   bare-metal:
-    name: Bare-Metal-Build (thumbv7em-none-eabihf)
+    name: Bare-Metal-Build (${{ matrix.target }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [thumbv7em-none-eabihf, thumbv7m-none-eabi, thumbv6m-none-eabi, riscv32imc-unknown-none-elf]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Rust installieren
-        run: rustup toolchain install stable --profile minimal --target thumbv7em-none-eabihf && rustup default stable
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }} && rustup default stable
       - name: neuronws-layers in allen Feature-Kombinationen
         run: |
           for features in "" "libm" "alloc" "alloc,libm"; do
             echo "== neuronws-layers (${features:-keine Features})"
-            cargo build -p neuronws-layers --no-default-features --features "$features" --target thumbv7em-none-eabihf
+            cargo build -p neuronws-layers --no-default-features --features "$features" --target ${{ matrix.target }}
           done
       - name: neuronws-perceptrons und neuronws-digits
         run: |
-          cargo build -p neuronws-perceptrons --target thumbv7em-none-eabihf
-          cargo build -p neuronws-digits --no-default-features --target thumbv7em-none-eabihf
-          cargo build -p neuronws-digits --target thumbv7em-none-eabihf
+          cargo build -p neuronws-perceptrons --target ${{ matrix.target }}
+          cargo build -p neuronws-digits --no-default-features --target ${{ matrix.target }}
+          cargo build -p neuronws-digits --target ${{ matrix.target }}
 
-  # Das Programm in `mcu/` läuft wirklich ohne Betriebssystem, im Emulator QEMU (ein Cortex-M4F).
+  # Das Programm in `mcu/` läuft wirklich ohne Betriebssystem, im Emulator QEMU: auf einem Cortex-M4F
+  # (Fließkomma in der Hardware) und auf einem Cortex-M3 (Fließkomma in Software). Beide müssen
+  # dasselbe rechnen wie der Rechner.
   mcu:
     name: Mikrocontroller-Emulator (QEMU)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Rust und QEMU installieren
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt,clippy --target thumbv7em-none-eabihf
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy --target thumbv7em-none-eabihf --target thumbv7m-none-eabi
           rustup default stable
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends qemu-system-arm

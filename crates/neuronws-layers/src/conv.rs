@@ -232,19 +232,20 @@ fn scaled_sum<T: Scalar, const STRIDE: usize>(grads: &[T], source: &[T]) -> T {
 
     const LANES: usize = 8;
     let mut partial = [T::ZERO; LANES];
-    // `source` ist meist länger als `grads` (es reicht bis zum Zeilenende). Zusammengehören nur die
-    // ersten `grads.len()` Werte.
-    let full = grads.len() / LANES * LANES;
-    for (g_chunk, x_chunk) in grads[..full]
-        .chunks_exact(LANES)
-        .zip(source[..full].chunks_exact(LANES))
-    {
+    // `as_chunks` zerlegt in Stücke aus genau `LANES` Werten und einen Rest. `source` ist meist
+    // länger als `grads` (es reicht bis zum Zeilenende), zusammengehören nur die ersten
+    // `grads.len()` Werte. Das `zip` hört beim kürzeren auf, und der Rest von `grads` bekommt
+    // die Werte von `source` direkt dahinter.
+    let (grad_chunks, grad_rest) = grads.as_chunks::<LANES>();
+    let (source_chunks, _) = source.as_chunks::<LANES>();
+    for (g_chunk, x_chunk) in grad_chunks.iter().zip(source_chunks) {
         for lane in 0..LANES {
             partial[lane] += g_chunk[lane] * x_chunk[lane];
         }
     }
     let mut sum = partial.iter().fold(T::ZERO, |sum, &p| sum + p);
-    for (&g, &x) in grads[full..].iter().zip(&source[full..]) {
+    let full = grad_chunks.len() * LANES;
+    for (&g, &x) in grad_rest.iter().zip(&source[full..]) {
         sum += g * x;
     }
     sum

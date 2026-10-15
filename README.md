@@ -3,11 +3,11 @@
 Neuronale Netze in Rust, die **ohne Betriebssystem** laufen: `no_std`, ohne `alloc`, ohne `std` und ohne
 fremde Bibliotheken. Die einzige erlaubte Abhängigkeit ist [`libm`](https://crates.io/crates/libm) für
 Mathe-Funktionen wie `exp` und `tanh`, und auch die nur hinter einem Feature. Alle Größen eines Netzes
-stehen im Typ, das Netz liegt komplett auf dem Stack oder in einer `static`.
+stehen im Typ, das Netz liegt komplett auf dem Stack (ein fertiges, nur benutztes Netz auch als `const`
+oder `static` im Flash).
 
-Das Projekt ist zum Lernen gebaut: Jede Schicht hat ihre Rückwärtsrechnung von Hand geschrieben und
-mit einem numerischen Gradienten-Check abgesichert, und die Dokumentation erklärt, **warum** etwas so
-gemacht ist.
+Das Projekt ist zum Lernen gebaut: Die Rückwärtsrechnung jeder Schicht ist von Hand geschrieben und
+gegen die numerische Ableitung geprüft, und die Dokumentation erklärt, **warum** etwas so gemacht ist.
 
 ## Die Crates
 
@@ -149,9 +149,10 @@ Weitere ist ein Feature, und jedes Feature steht wirklich hinter seinem Schalter
 | `alloc` | Alles, was den Heap braucht: `Box<M>` als Schicht, damit große Netze nicht auf dem Stack liegen. Braucht einen globalen Allocator, aber nicht `std`. |
 
 Sind `std` **und** `libm` an, gewinnt `libm`: Dann rechnet jede Plattform mit demselben Code und bekommt
-dieselben Ergebnisse. Das ist gemessen: Das XOR-Beispiel liefert auf dem emulierten Cortex-M4F und auf dem
-Rechner dieselben Ausgaben, bis auf das letzte Bit (bei der Erstellung geprüft), und `scripts/mcu.sh`
-vergleicht den Fehlerwert bei jedem Lauf (siehe [`mcu`](mcu)).
+dieselben Ergebnisse. Das ist gemessen: Das XOR-Beispiel liefert auf dem x86-64-Rechner, dem emulierten
+Cortex-M4F (Hardware-Fließkomma) und dem emulierten Cortex-M3 (Software-Fließkomma) dieselben Ausgaben,
+bis auf das letzte Bit. `scripts/mcu.sh` vergleicht bei jedem Lauf die Bits der beiden Prozessoren und den
+Fehlerwert mit dem Rechner (siehe [`mcu`](mcu)).
 
 `libm` darf überall benutzt werden, es ist die einzige erlaubte Abhängigkeit. Es bleibt trotzdem ein
 Feature statt einer festen Abhängigkeit, damit das Crate ohne jede Abhängigkeit baut, wenn man keine
@@ -248,10 +249,15 @@ einer `BatchNorm`, Mittelwert und Streuung einer `Standardize`), gehört nicht d
 
 ## Auf dem Mikrocontroller
 
-[`mcu`](mcu) ist ein echtes Bare-Metal-Programm für das Ziel `thumbv7em-none-eabihf` (Cortex-M4F), ohne
-Betriebssystem, `std` und `alloc`. Es lernt XOR, speichert und lädt Gewichte, prüft das Perceptron und
-misst Flash und Stack. Es läuft im Emulator QEMU: `scripts/mcu.sh`. Auf **echter Hardware** ist es noch
-nicht ausprobiert, siehe [`mcu/README.md`](mcu/README.md) und die offene Aufgabe in [`TODO.md`](TODO.md).
+[`mcu`](mcu) ist ein echtes Bare-Metal-Programm ohne Betriebssystem, `std` und `alloc`. Es lernt XOR,
+speichert und lädt Gewichte, prüft das Perceptron und misst Flash und Stack. Es läuft im Emulator QEMU
+(`scripts/mcu.sh`) auf einem **Cortex-M4F** (Fließkomma in der Hardware) und auf einem **Cortex-M3**
+(Fließkomma in Software) und liefert auf beiden und auf dem Rechner dieselben Zahlen, bis auf das letzte
+Bit. Dazu wird die Bibliothek für den Cortex-M0/M0+ (zum Beispiel RP2040) und für RISC-V gebaut, in
+jeder Feature-Kombination.
+
+Auf **echter Hardware** ist es noch nicht ausprobiert, siehe [`mcu/README.md`](mcu/README.md) und die
+offene Aufgabe in [`TODO.md`](TODO.md).
 
 ## Stolpersteine
 
@@ -262,7 +268,8 @@ nicht ausprobiert, siehe [`mcu/README.md`](mcu/README.md) und die offene Aufgabe
   `RmsProp`, ...) lässt das Netz den Typ bestimmen.
 - **Größenfehler erst beim Bauen:** siehe oben, `check_sizes!` hilft.
 - **Der Debug-Build braucht viel mehr Stack** als der Release-Build (Faktor 4 bis 6), siehe oben. Ein
-  Stack-Überlauf zeigt sich als Absturz ohne Meldung.
+  Stack-Überlauf bricht mit `std` mit der Meldung *has overflowed its stack* ab. Auf einem
+  Mikrocontroller bleibt er oft stumm und zeigt sich als Absturz oder als beschädigte Daten.
 - **`forward` und `forward_mut` sind nicht dasselbe:** Nur `forward_mut` (Lernen) schaltet Dropout und
   Rauschen ein und führt Statistik nach. Zum Benutzen eines fertigen Netzes immer `forward`.
 - **`BatchNorm` rechnet mit laufender Statistik**, nicht mit der Statistik des Mini-Batches (jedes Beispiel
@@ -301,14 +308,14 @@ Was bewusst so gebaut ist, und warum:
 | Befehl | Was er tut |
 |---|---|
 | `scripts/check.sh quick` | Format, Clippy (`-D warnings`) und Tests ohne Feature und mit `libm`. Für zwischendurch. |
-| `scripts/check.sh` | Dazu alle Feature-Kombinationen, Dokumentation ohne Warnungen, Bare-Metal-Builds, alle Beispiele und der Test im Emulator (falls `qemu-system-arm` da ist). Dasselbe prüft die CI. |
+| `scripts/check.sh` | Dazu alle Feature-Kombinationen (auch bei der Dokumentation), Bare-Metal-Builds für vier Prozessoren, alle Beispiele und der Test im Emulator (falls `qemu-system-arm` da ist). Dasselbe prüft die CI. |
 | `scripts/examples.sh` | Baut und startet alle Beispiele im Release-Build. |
-| `scripts/mcu.sh` | Baut das Mikrocontroller-Programm und führt es in QEMU aus. |
+| `scripts/mcu.sh` | Baut das Mikrocontroller-Programm für Cortex-M4F und Cortex-M3 und führt es in QEMU aus. |
 
 Die CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) macht dasselbe, jede Feature-Kombination
-als eigener Job. Der Bare-Metal-Build für `thumbv7em-none-eabihf` ist der eigentliche Beweis für
-`no_std` ohne `alloc`: Dort gibt es keine `std` und keinen Heap, jede versehentliche Benutzung wäre ein
-Fehler.
+als eigener Job. Die Bare-Metal-Builds (Cortex-M4F, M3, M0/M0+ und RISC-V) sind der eigentliche Beweis
+für `no_std` ohne `alloc`: Dort gibt es keine `std` und keinen Heap, jede versehentliche Benutzung wäre
+ein Fehler.
 
 ## Konventionen
 
@@ -317,6 +324,8 @@ Fehler.
 - **`unsafe` ist in der ganzen Bibliothek verboten** (`unsafe_code = "forbid"`). Nur das Testprogramm
   in `mcu/` braucht es (Startcode, Semihosting) und ist deshalb ein eigener Workspace.
 - **Keine fremden Bibliotheken**, außer `libm` hinter dem gleichnamigen Feature.
-- **Jede Schicht hat einen Gradienten-Check** gegen die numerische Ableitung.
+- **Jede Schicht hat einen Gradienten-Check** gegen die numerische Ableitung (`gradcheck`). Bei Schichten mit
+  Zufall (`Dropout`, `GaussianNoise`, `Reparameterize`) gilt er für die gezogene Maske beziehungsweise das
+  gezogene Rauschen.
 
 Offene Aufgaben und Ideen stehen in [`TODO.md`](TODO.md).
