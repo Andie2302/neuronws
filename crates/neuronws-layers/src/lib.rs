@@ -1,6 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 pub mod activation;
 pub mod activation_layer;
+#[cfg(any(feature = "std", feature = "libm"))]
+pub mod adam;
 pub mod block;
 pub mod chain;
 pub mod dense_layer;
