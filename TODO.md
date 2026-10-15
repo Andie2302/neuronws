@@ -6,108 +6,168 @@ Alles, was wir noch umsetzen wollen oder könnten. Neue Ideen einfach unten in d
 - `[x]` erledigt
 - Das Ausrufezeichen `!` markiert, was uns besonders wichtig ist.
 
-## Als Nächstes
+Der große Block "Als Nächstes", "Eigene Schichten", "Bausteine", "Praxis", "Perceptron" und "Aufräumen"
+ist abgearbeitet. Was fertig ist, steht unten unter **Erledigt**, die Entscheidungen, die dabei fielen,
+unter **Entscheidungen** (ausführlicher in der [README](README.md)).
 
-- [ ] ! **README und Dokumentation** (von dir auf später verschoben, weil sich noch Dinge ändern).
-  Inhalt: Überblick über die Crates, die Bausteine (`Operation`, `Block`, `Chain`, `Trainer`), Features (`std`, `alloc`, `libm`), ein Einstiegsbeispiel.
-- [ ] **CI mit GitHub Actions**: Tests mit allen Feature-Kombinationen (keine / `std` / `libm` / beide), Clippy mit `-D warnings`, Bare-Metal-Build (`thumbv7em-none-eabihf`), Beispiele ausführen.
-- [ ] **Trainings- und Testdaten trennen** plus **Early Stopping** (abbrechen, wenn der Test-Verlust wieder steigt). Im Beispiel `adam_classifier` sieht man schon leichtes Overfitting.
-- [ ] **Daten pro Runde mischen** im `Trainer` (z. B. `epoch_shuffled(model, data, rng)`).
-- [ ] **Hilfsfunktion für die Trefferquote** (Accuracy), damit nicht jedes Beispiel `argmax` selbst schreibt.
+## Offen
 
-## Eigene Schichten
+- [ ] ! **Auf einem echten Mikrocontroller ausprobieren.** Das Testprogramm in [`mcu/`](mcu/README.md)
+  läuft im Emulator QEMU auf einem Cortex-M4F (ohne Betriebssystem, `std` und `alloc`, Ergebnis bitgleich
+  zum Rechner), aber auf echter Hardware noch nicht. Dafür fehlt ein Gerät. Was zu tun ist, steht in
+  `mcu/README.md`, Abschnitt "Auf einen echten Chip übertragen". **Bitte hier eintragen:** Chip, Takt und
+  die Zeile `Flash belegt ... Stack benutzt ...` aus der Ausgabe.
+- [ ] **CI auf GitHub ansehen.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ist geschrieben
+  und lokal geprüft (die YAML-Datei ist gültig, und jeder Befehl daraus läuft lokal, zusammengefasst in
+  `scripts/check.sh`). Auf GitHub selbst ist sie noch nie gelaufen. Nach dem ersten Push im Reiter
+  *Actions* nachsehen, ob alle Jobs grün sind.
 
-- [ ] Dropout (braucht Zufall und einen Trainings-/Test-Modus)
-- [ ] Residual-Verbindung (`y = x + f(x)`)
-- [ ] Diagonal-Schicht (ein Gewicht pro Eingang)
-- [ ] Batch-Normalisierung und Layer-Normalisierung
-- [ ] Faltungsschicht (Convolution) und Pooling
-- [ ] Einbettungen (Embedding) und Rekurrente Zellen (RNN/GRU/LSTM), falls wir je Folgen verarbeiten wollen
+### Ideen, die beim Abarbeiten aufgefallen sind
+
+- [ ] **Aufmerksamkeit (Attention) und ein Transformer-Block.** `Residual`, `LayerNorm` und `Embedding`
+  gibt es, `Attention` fehlt noch. Auch sie wäre eine Operation auf einer Folge fester Länge.
+- [ ] **`Concat` für U-Net-artige Netze.** `Residual`, `Fork` und `Add` stehen, aber Kanäle
+  zusammenzufügen (statt zu addieren) geht noch nicht.
+- [ ] **GAN:** zwei Netze mit je eigenem Optimierer. Die Bausteine passen, der `Trainer` kennt aber nur
+  ein Netz.
+- [ ] **Reinforcement Learning (DQN):** Ringpuffer fester Größe, Verlust, der nur eine Aktion zählt,
+  Parameter in ein Zielnetz kopieren (`parameters()` und `set_parameters()` gibt es dafür schon).
+- [ ] **`BatchNorm` mit echter Statistik des Mini-Batches.** Jetzt rechnet sie mit laufender Statistik
+  (siehe unten), weil jedes Beispiel einzeln durch das Netz geht. Echte Batch-Statistik bräuchte eine
+  Operation, die den ganzen Batch sieht.
+- [ ] **Variable Folgenlängen** für RNN, GRU und LSTM: ein Auffüll-Helfer samt Maske. Die Länge steht
+  bisher fest im Typ.
+- [ ] **Faltung für große Bilder:** `im2col` oder kachelweises Rechnen. Die Messung
+  ([`bench_conv`](crates/neuronws-layers/examples/bench_conv.rs)) zeigt, dass es sich erst bei viel
+  größeren Bildern und Kanalzahlen lohnt, als eine Bibliothek ohne Heap sinnvoll auf den Stack bekommt.
+- [ ] **Optimierer-Vergleich mit Lernraten-Plan und längerem Training.**
+  [`optimizer_comparison`](crates/neuronws-layers/examples/optimizer_comparison.rs) nimmt eine feste
+  Rundenzahl ohne Plan. Mit Plan (`CosineDecay`, `Warmup`) kann es anders aussehen.
+- [ ] **Der Zahlenvergleich Rechner gegen Mikrocontroller** (`scripts/mcu.sh`) prüft nur den Fehlerwert
+  auf drei Stellen. Bitgleich ist er bei der Erstellung geprüft worden, steht aber nicht als Test
+  im Projekt, weil er bei jeder Änderung der Rechenreihenfolge neu eingetragen werden müsste.
 
 ## Andere Netzarten
 
-Unser Stand ist ein Multi-Layer-Perceptron, der Unterbau ist aber allgemeiner: eine Kette von Rechenschritten (`Operation`) mit handgeschriebener Rückwärtsrechnung. Die Einschätzungen stammen aus dem Entwurf, nichts davon ist ausprobiert.
+Unser Stand war ein Multi-Layer-Perceptron, der Unterbau ist aber allgemeiner: eine Kette von
+Rechenschritten (`Operation`) mit handgeschriebener Rückwärtsrechnung. Die Tabelle zeigt, was daraus
+geworden ist.
 
-| Netzart | Passt? | Was nötig wäre |
+| Netzart | Stand | Bemerkung |
 |---|---|---|
-| Autoencoder | ja | Nichts, das Ziel ist die Eingabe. |
-| RBF-Netze | ja | Nur eine neue `Operation` (Abstand zu Zentren). |
-| CNN (Faltung, Pooling) | fast | Neue Operationen. `Values` kann bisher nur Vektoren und Matrizen, für Bilder mit Kanälen braucht es tiefere Verschachtelung. Wegen fester Größen muss die Ausgabegröße als eigene Zahl angegeben werden. |
-| RNN / LSTM / GRU | mit Kniff | Die ganze Folge als eine Operation mit fester Länge (`[[T; D]; STEPS]`), die Rückwärtsrechnung über die Zeit steckt in `backward`. Variable Längen ohne `alloc` nur mit Auffüllen. |
-| Transformer / Attention | mit Kniff | Auch eine Operation auf einer Folge, dazu Residual-Verbindungen und Layer-Norm. |
-| ResNet, U-Net | Umbau am Rand | `Chain` kann nur geradeaus. Kombinatoren wie `Residual` und `Fork` nötig, der Kern bleibt unberührt. |
-| Dropout, VAE | kleiner Umbau | `forward` bekommt keinen Zufall. Weg finden, einen `Rng` oder Zustand hineinzugeben. |
-| GAN | Trainingsschleife neu | Zwei Netze mit je eigenem Optimierer (passt zu Option A), aber der `Trainer` kann es nicht. |
+| Autoencoder | geht | Das Ziel ist die Eingabe. Für Bilder gibt es `ConvTranspose2d` zum Hochskalieren. |
+| RBF-Netze | geht | Nur eine neue `Operation` (Abstand zu Zentren), nicht gebaut. |
+| CNN (Faltung, Pooling) | **gebaut** | `Conv2d` (Schrittweite, Rand, Dilation), `Conv1d`, `ConvTranspose2d`, `MaxPool2d`, `AvgPool2d`. Beispiel `cnn_lines`. |
+| RNN / LSTM / GRU | **gebaut** | Die ganze Folge als eine Operation mit fester Länge (`[[T; D]; STEPS]`), die Rückwärtsrechnung über die Zeit steckt in `backward`. Der Entwurf trägt. Beispiel `sequence_memory`. |
+| Transformer / Attention | mit Kniff | `Residual`, `LayerNorm` und `Embedding` stehen, `Attention` fehlt. |
+| ResNet, U-Net | **ResNet gebaut** | `Residual`, `Fork`, `Add`. Für ein U-Net fehlt `Concat`. |
+| Dropout, VAE | **gebaut** | `Operation::forward_train` gibt dem Lern-Durchgang Zufall und Zustand. `Dropout`, `GaussianNoise`, `Reparameterize`. |
+| GAN | Trainingsschleife neu | Zwei Netze mit je eigenem Optimierer. Der `Trainer` kann es nicht. |
 | Reinforcement Learning (DQN) | fast | Ringpuffer fester Größe, Loss der nur eine Aktion zählt, Parameter in ein Zielnetz kopieren. |
 | SOM, Hopfield, Boltzmann-Maschinen | andere Welt | Lernen ohne Gradienten. `Loss`, `backward`, `Optimizer` passen nicht. Die getrennten Capability-Traits erlauben es trotzdem: nur `Layer` und `ForwardPath` plus ein eigenes Lern-Trait. |
 
-Die drei echten Engstellen:
+## Entscheidungen
 
-- [x] **Formen verallgemeinern:** `Trainer`, `train_epoch` und `Loss` arbeiten mit beliebigen Formen (`Values`). Ein allgemeiner `impl` für `[V; N]` ging doch, ganz ohne Makro.
-- [ ] `Softmax` und `Standardize` kennen nur Vektoren. Für Bilder auf eine Achse (z. B. Softmax über die Kanäle) verallgemeinern.
-- [ ] `Linear` (Dense) nimmt nur Vektoren. Mit `Reshape` davor und danach ist das kein Hindernis, eine Variante für Matrizen wäre aber bequemer.
-- [ ] **Feste Größen:** Später eventuell eine dynamische Variante hinter dem Feature `alloc`.
-- [ ] **Faltung erweitern:** Schrittweite (stride), Rand auffüllen (padding, „same"), Dilation, 1D-Faltung für Folgen, Transponierte Faltung (zum Hochskalieren).
-- [ ] **Die Faltung hat 8 Konstanten** (`Conv2d<C_IN, C_OUT, H, W, KH, KW, OH, OW>`), weil Rust `H − KH + 1` im Typ noch nicht ausrechnen kann (`generic_const_exprs` ist instabil). Prüfen, ob ein Makro, ein Typ-Bündel (z. B. ein Trait `Geometry`) oder später die stabile Sprachfunktion das lesbarer macht.
-- [ ] **Fehler in Größenprüfungen erscheinen erst beim Bauen:** Falsche Größen bei `Conv2d`, Pooling und `Reshape` meldet `cargo build`/`cargo test`, aber nicht `cargo check` und wohl auch nicht RustRover beim Tippen. Prüfen, ob es eine bessere Lösung gibt, und es in der README erklären.
-- [ ] Bequeme Helfer wie `neurons(...)`, aber für Bilder (Faltung + Aktivierung in einem Aufruf).
-- [ ] Kombinatoren für Verzweigungen: `Residual`, `Fork` (Gradienten der Zweige addieren).
-- [ ] Weg für Zufall in `forward` (Dropout, VAE).
+Was beim Abarbeiten bewusst so entschieden wurde (die Gründe stehen in der README, Abschnitt
+"Entscheidungen"):
 
-Empfohlene Reihenfolge, falls wir eine andere Netzart bauen wollen:
-
-- [x] **CNN**: `Conv2d`, `MaxPool2d`, `AvgPool2d` stehen, Beispiel `cnn_lines` erkennt Linien mit 91 Parametern. Der Entwurf hält.
-- [ ] ! Als Nächstes ein **RNN** (zeigt, ob „Folge als eine Operation" trägt).
-
-## Bausteine zum Austauschen
-
-Aktivierungsfunktionen:
-- [ ] Leaky ReLU, ELU, GELU, Swish/SiLU, Softplus
-- [ ] Hartes Tanh / Hard Sigmoid (ohne `exp`, auch ohne `libm` nutzbar)
-
-Fehlerfunktionen:
-- [ ] Huber-Loss, Mean Absolute Error
-- [ ] Kreuzentropie, die Softmax und Loss in einem Schritt rechnet (numerisch stabiler)
-
-Startwerte (Initializer):
-- [ ] Normalverteilung statt Gleichverteilung (Box-Muller) für Xavier/He
-- [ ] Orthogonale Initialisierung
-
-Optimierer:
-- [ ] Nesterov-Momentum, RMSprop, AdaGrad
-- [ ] Gradient Clipping (Gradienten begrenzen)
-- [ ] L2-Regularisierung als eigener Baustein
-
-Lernraten-Pläne:
-- [ ] Cosine Decay (braucht `cos`, nur mit `std`/`libm`)
-- [ ] Warmup (am Anfang langsam hochfahren)
-- [ ] Plan, der auf den Verlust reagiert (Reduce on Plateau)
-
-## Praxis
-
-- [ ] **Gewichte speichern und laden**, ohne `std` und `alloc` (z. B. als Rust-Konstanten ausgeben oder in ein Byte-Array schreiben)
-- [ ] ! **Große Netze und Stack:** Jeder `Block` hält Eingabe, Ausgabe und Eingabe-Gradient als Arrays, dazu Parameter und Gradienten. Der Optimierer legt `m` und `v` (Adam) zusätzlich an. Bei Bildern wird das schnell groß: eine Faltung mit 16 Kanälen auf 28×28 hat schon über 12 000 Werte pro Array, und jedes Array liegt mehrfach auf dem Stack. Messen, ab welcher Größe der Stack (Standard 2 MB im Test-Thread) überläuft, und eine Lösung finden (z. B. `Box` hinter `alloc`, Statics oder Slices).
-- [ ] **Geschwindigkeit der Faltung:** Naive Schleifen, keine Matrix-Tricks (im2col). Für kleine Bilder egal, für größere messen (Benchmarks, siehe unten).
-- [ ] Beispiel **Ziffernerkennung** mit Adam und Softmax neu aufsetzen und mit dem alten Ergebnis vergleichen
-- [ ] Beispiel auf einem echten Mikrocontroller (`no_std`) ausprobieren
-- [ ] Benchmarks: SGD gegen Momentum gegen Adam auf mehreren Aufgaben
-
-## Perceptron-Crate
-
-- [ ] Perceptron-Lernregel (die klassische, nicht die per Gradient) sauber dokumentieren
-- [ ] Beispiele für AND/OR/XOR mit dem Perceptron und die Grenzen von XOR erklären
-- [ ] Prüfen, ob `Perceptron::new` wieder `const fn` werden kann (ging vor dem `Block`-Umbau)
-
-## Aufräumen
-
-- [ ] `Trainable::PARAMETER_COUNT` und `Shape::LEN` sind jetzt doppelt vorhanden. Prüfen, ob eine der beiden Angaben reicht.
-- [ ] Reste des alten `Data`-Traits entfernen (von dir bereits als „kann weg" freigegeben)
-- [ ] Die Datenerzeugung von `cnn_lines` steht doppelt (Beispiel und Test). Gemeinsames Modul für Beispiele und Tests schaffen.
-- [ ] Namen und Doku über alle Crates einheitlich (Deutsch/Englisch) machen
-- [ ] Prüfen, ob `Optimizer::step` einen eigenen Fehlertyp braucht (z. B. bei `batch_size == 0`)
-- [ ] Stolperstein dokumentieren: Bei Literalen wie `Sgd::new(0.1)` kann Rust `f64` statt `f32` wählen, wenn es nichts anderes ableiten kann
+- **Keine dynamische Variante hinter `alloc`.** `Values` ist `Copy` und besteht aus Arrays fester Größe,
+  darauf bauen die Zwischenspeicher, das Gedächtnis der Optimierer und `parameters()`. Für das
+  eigentliche Problem (große Netze auf dem Stack) gibt es `Box<M>` hinter `alloc`.
+- **`Optimizer::step` hat keinen Fehlertyp.** Eine Batchgröße 0 ist ein Programmierfehler und bricht mit
+  einer Meldung ab, statt alle Parameter still zu `NaN` zu machen.
+- **`Trainable::PARAMETER_COUNT` folgt aus `Shape::LEN`** (Standardwert des Traits). Beide Angaben
+  bleiben, aber sie können nicht auseinanderlaufen.
+- **`libm` bleibt ein Feature.** Es darf überall benutzt werden und ist die einzige erlaubte
+  Abhängigkeit, aber ohne das Feature baut die Bibliothek ohne jede Abhängigkeit. Sind `std` und
+  `libm` an, gewinnt `libm`, damit jede Plattform dasselbe rechnet.
+- **Die Faltung braucht 11 Zahlen im Typ.** Ein Trait `Geometry` würde nicht helfen, denn `[T; G::H]` ist
+  als Array-Länge auf stabilem Rust nicht erlaubt. Stattdessen nehmen die Makros `conv2d!`, `conv1d!`,
+  `conv_transpose2d!` und die `const fn conv_output_size` die Rechnerei ab.
+- **Größenfehler erscheinen bei `cargo check` nur mit `check_sizes!`.** Ohne das Makro erst bei
+  `cargo build`.
+- **`BatchNorm` rechnet mit laufender Statistik**, nicht mit der des Mini-Batches. Diese Statistik und
+  die von `Standardize` gehören nicht zu `parameters()` und werden getrennt gesichert (`encode_slice`).
+- **Sprache:** Erklärungen, Kommentare, Dokumentation und Fehlermeldungen Deutsch, Bezeichner im Code und
+  Commit-Nachrichten Englisch.
 
 ## Erledigt
+
+### Dieser Durchgang
+
+- [x] **README und Dokumentation:** [`README.md`](README.md) (Crates, Bausteine, Features, Größen im Typ,
+  Stack, Speichern, Stolpersteine, Entscheidungen), Überblick im Crate selbst (`lib.rs`),
+  [`mcu/README.md`](mcu/README.md). Ein Test hält das Einstiegsbeispiel der README und ihre Verweise aktuell.
+- [x] **CI mit GitHub Actions** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): jede
+  Feature-Kombination als eigener Job, Clippy mit `-D warnings`, Format, Dokumentation ohne Warnungen
+  (auch je Kombination: Verweise auf Typen, die es ohne Feature nicht gibt, waren ein echter Fehler),
+  Bare-Metal-Build, alle Beispiele, Test im Mikrocontroller-Emulator. Lokal dasselbe: `scripts/check.sh`.
+- [x] **Trainings- und Testdaten trennen, Early Stopping:** `data::train_test_split`,
+  `shuffled_train_test_split`, `EarlyStopping`, `Trainer::fit_validated`.
+- [x] **Daten pro Runde mischen:** `Trainer::epoch_shuffled`, `fit_shuffled`.
+- [x] **Trefferquote:** `metrics::accuracy`, `binary_accuracy`, `argmax`, `confusion_matrix`.
+- [x] **Datensätze:** `datasets` (Logikgatter, Punktwolken, Linienbilder) für Beispiele und Tests. Die
+  doppelte Datenerzeugung von `cnn_lines` ist weg.
+
+Schichten:
+
+- [x] Dropout (mit `Operation::forward_train`), `GaussianNoise`, `Reparameterize`
+- [x] Residual-Verbindung (`Residual`, `Fork`, `Add`)
+- [x] Diagonal-Schicht
+- [x] Batch-Normalisierung und Layer-Normalisierung
+- [x] Embedding, RNN, GRU, LSTM, `LastStep`, `MeanOverSteps`
+- [x] Faltung erweitert: Schrittweite, Rand, Dilation, `Conv1d`, `ConvTranspose2d`
+- [x] `Softmax` und `Standardize` über eine Achse (`SoftmaxAcross`, `StandardizeChannels`)
+- [x] `LinearRows` (Dense für Matrizen), `Each` (eine parameterlose Operation auf jede Zeile)
+- [x] `neurons(...)` funktioniert für jede Form, also auch für Bilder (Faltung und Aktivierung in einem
+  Aufruf)
+- [x] Weg für Zufall in `forward`: `Operation::forward_train`
+
+Bausteine:
+
+- [x] Aktivierungen: Leaky ReLU, ELU, GELU, Swish, SiLU, Softplus, Hard Tanh, Hard Sigmoid
+- [x] Fehlerfunktionen: Huber, Mean Absolute Error, `SoftmaxCrossEntropy` (Softmax und Fehler in einem Schritt)
+- [x] Startwerte: Normalverteilung (Box-Muller, `Normal`, `XavierNormal`, `HeNormal`), `Orthogonal`
+- [x] Optimierer: Nesterov-Momentum, `RmsProp`, `AdaGrad`
+- [x] Gradient Clipping (`ClipValue`, `ClipNorm`) und L2-Regularisierung (`L2`) als Hüllen um jeden Optimierer
+- [x] Lernraten-Pläne: `CosineDecay`, `Warmup`, `ReduceOnPlateau`
+
+Praxis:
+
+- [x] **Gewichte speichern und laden** ohne `std` und `alloc`: Bytes mit Prüfsumme (`save_parameters`,
+  `load_parameters`) und Rust-Konstanten (`write_rust_const`).
+- [x] **Große Netze und Stack:** gemessen (`stack_budget`), Tabelle in der README und in `boxed`. Lösung:
+  `Box<M>` hinter `alloc`, ohne `alloc` die Größe vorher kennen (`size_of`).
+- [x] **Geschwindigkeit der Faltung:** gemessen (`bench_conv`) und vorwärts drei- bis siebenmal schneller
+  gemacht. Weiter kommt man erst mit `im2col`, siehe oben.
+- [x] **Ziffernerkennung mit Adam** (`adam_vs_sgd`): Ergebnis: Die Lernrate war der Engpass, nicht der
+  Optimierer.
+- [x] **Benchmarks** SGD gegen Momentum gegen Adam und weitere auf mehreren Aufgaben
+  (`optimizer_comparison`).
+- [x] Mikrocontroller: Programm und Emulator-Test sind da, die echte Hardware steht noch offen (siehe oben).
+
+Perceptron:
+
+- [x] Lernregel (die klassische, nicht die per Gradient) dokumentiert und gezeigt, dass sie ein
+  SGD-Schritt mit `y − t` als Ausgangs-Gradient ist (Test, Bit für Bit gleich).
+- [x] Beispiel `learn_gates`: AND, OR, NAND, die Grenze bei XOR und zwei Schichten als Ausweg.
+- [x] `Perceptron::new` ist wieder eine `const fn` (das Perceptron hält seine Zahlen selbst, ohne `Block`).
+
+Aufräumen:
+
+- [x] `PARAMETER_COUNT` und `Shape::LEN`: kein Widerspruch mehr möglich (siehe Entscheidungen)
+- [x] Reste des alten `Data`-Traits: nur noch ein Test-Alias, umbenannt
+- [x] Namen und Doku einheitlich: Sprachregel festgelegt, englische Prosa im Code gesucht und behoben
+- [x] `Optimizer::step` und `batch_size == 0`: Entscheidung, kein Fehlertyp
+- [x] Stolperstein `Sgd::new(0.1)` mit `f64`-Literal dokumentiert, `Sgd::for_model` als Ausweg
+
+Größen und Fehler:
+
+- [x] Die Faltung hat 11 Konstanten: Makros und `conv_output_size` statt Typ-Bündel (siehe Entscheidungen)
+- [x] Fehler in Größenprüfungen: `check_sizes!` und Erklärung in README und Doku
+- [x] Feste Größen: dynamische Variante geprüft und verworfen (siehe Entscheidungen)
+
+### Vorher
 
 - [x] Capability-Traits (`Layer`, `ForwardPath`, `BackwardPath`, `Trainable`, …)
 - [x] `Chain` und `.then(...)`
@@ -123,3 +183,5 @@ Lernraten-Pläne:
 - [x] `Trainer` (Loss + Optimizer + Batchgröße) und Lernraten-Pläne (`Constant`, `StepDecay`, `LinearDecay`)
 - [x] `Conv2d`, `MaxPool2d`, `AvgPool2d` mit Gradienten-Check und Training im Test
 - [x] Beliebige Formen: `Values` für beliebig tief verschachtelte Arrays, `Loss`/`Trainer` für jede Form, `Elementwise` für jede Form, `Reshape` zum Umordnen (z. B. Bild zu Vektor)
+- [x] Formen verallgemeinern: `Trainer`, `train_epoch` und `Loss` arbeiten mit beliebigen Formen (`Values`)
+- [x] CNN: `Conv2d`, `MaxPool2d`, `AvgPool2d`, Beispiel `cnn_lines` erkennt Linien mit 91 Parametern

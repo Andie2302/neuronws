@@ -3,6 +3,8 @@ resolver = "3"
 members = [
     "crates/*",
 ]
+# Das Testprogramm für den Mikrocontroller braucht `unsafe` und ist deshalb ein eigener Workspace.
+exclude = ["mcu"]
 
 [workspace.package]
 version = "0.1.0"

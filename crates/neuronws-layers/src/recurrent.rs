@@ -1,4 +1,4 @@
-//! Rekurrente Schichten für Folgen: [`Rnn`], [`Gru`] und [`Lstm`].
+//! Rekurrente Schichten für Folgen: [`Rnn`], `Gru` und `Lstm`.
 //!
 //! # Eine Folge ist eine Operation
 //!
@@ -27,8 +27,8 @@
 //! | | Tore | Parameter (in `H`, `IN`) | gut für |
 //! |---|---|---|---|
 //! | [`Rnn`] | keins | `H·(IN + H + 1)` | kurze Folgen, Einstieg |
-//! | [`Gru`] | 2 + Kandidat | `3·H·(IN + H + 1)` | längere Folgen, wenig Aufwand |
-//! | [`Lstm`] | 3 + Kandidat, extra Zellzustand | `4·H·(IN + H + 1)` | lange Abhängigkeiten |
+//! | `Gru` | 2 + Kandidat | `3·H·(IN + H + 1)` | längere Folgen, wenig Aufwand |
+//! | `Lstm` | 3 + Kandidat, extra Zellzustand | `4·H·(IN + H + 1)` | lange Abhängigkeiten |
 //!
 //! Das einfache RNN vergisst schnell, weil der Gradient bei jedem Schritt mit denselben Gewichten
 //! multipliziert wird und dadurch nach vielen Schritten verschwindet oder explodiert. Die Tore von
@@ -38,7 +38,7 @@
 //!
 //! Wie weit sich jede der drei Zellen erinnert, misst das Beispiel `sequence_memory`. Dabei zeigt
 //! sich: Die Tore schützen das Gedächtnis nur, wenn sie am Anfang des Lernens offen stehen (siehe
-//! die Bias-Hinweise bei [`Gru`] und [`Lstm`]), und das einfache RNN profitiert deutlich von
+//! die Bias-Hinweise bei `Gru` und `Lstm`), und das einfache RNN profitiert deutlich von
 //! orthogonalen Startwerten.
 //!
 //! `Rnn` braucht nur eine Aktivierung (`Tanh` oder, ohne Mathe-Bibliothek, `HardTanh`). `Gru` und

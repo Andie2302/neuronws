@@ -1,4 +1,4 @@
-//! Schichten mit Zufall: [`Dropout`], [`GaussianNoise`] und [`Reparameterize`].
+//! Schichten mit Zufall: [`Dropout`], `GaussianNoise` und `Reparameterize`.
 //!
 //! Sie zeigen, wie der Zufall in `forward` kommt: Eine [`Operation`] überschreibt
 //! [`forward_train`](Operation::forward_train), zieht dort ihre Zufallszahlen und merkt sich in

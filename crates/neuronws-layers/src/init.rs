@@ -14,7 +14,7 @@ pub trait Initializer {
     /// wird (Zeile = ein Neuron, zeilenweise nummeriert wie bei [`Values`]).
     ///
     /// Der Standard zieht jeden Wert einzeln mit [`sample`](Self::sample). Verfahren, bei denen
-    /// die Werte einer Matrix zusammenhängen (zum Beispiel [`Orthogonal`]), überschreiben das.
+    /// die Werte einer Matrix zusammenhängen (zum Beispiel `Orthogonal`), überschreiben das.
     fn fill<T: Scalar, V: Values<T>>(
         &self,
         rng: &mut Rng,

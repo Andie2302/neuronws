@@ -1,0 +1,109 @@
+# Prüft bei jedem Push und jeder Pull-Request, was auch `scripts/check.sh` lokal prüft:
+# Format, Clippy ohne Warnungen, Tests in allen Feature-Kombinationen, Dokumentation, die
+# Bare-Metal-Builds ohne Betriebssystem, alle Beispiele und das Testprogramm im Mikrocontroller-Emulator.
+#
+# Die Bibliothek ist standardmäßig `no_std` ohne `alloc` und ohne `std`. Deshalb läuft jede
+# Kombination, auch die ohne jedes Feature, als eigener Job.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust installieren
+        run: rustup toolchain install stable --profile minimal --component rustfmt && rustup default stable
+      - run: cargo fmt --all -- --check
+      - run: cargo fmt --manifest-path mcu/Cargo.toml -- --check
+
+  layers:
+    name: layers (${{ matrix.features || 'keine Features' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: ["", "std", "libm", "std,libm", "alloc", "alloc,std,libm"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust installieren
+        run: rustup toolchain install stable --profile minimal --component clippy && rustup default stable
+      - name: Clippy
+        run: cargo clippy -p neuronws-layers --no-default-features --features "${{ matrix.features }}" --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test -p neuronws-layers --no-default-features --features "${{ matrix.features }}"
+
+  workspace:
+    name: Perceptron, Ziffern und Beispiele
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust installieren
+        run: rustup toolchain install stable --profile minimal --component clippy && rustup default stable
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - name: Alle Beispiele ausführen
+        run: scripts/examples.sh
+
+  docs:
+    name: Dokumentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust installieren
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      # Verweise auf Typen, die es ohne ein Feature nicht gibt, sind ein Fehler. Deshalb wird die
+      # Dokumentation von neuronws-layers für jede Kombination einzeln gebaut.
+      - name: Dokumentation ohne Warnungen bauen
+        run: |
+          for features in "" "std" "libm" "std,libm" "alloc" "alloc,std,libm"; do
+            echo "== neuronws-layers (${features:-keine Features})"
+            cargo doc -p neuronws-layers --no-default-features --features "$features" --no-deps
+          done
+          cargo doc --workspace --no-deps
+          cargo doc -p neuronws-digits --no-default-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # Der eigentliche Beweis für `no_std` ohne `alloc`: ein Ziel ohne Betriebssystem. Dort gibt es
+  # weder `std` noch einen Heap, jede versehentliche Benutzung wäre ein Fehler.
+  bare-metal:
+    name: Bare-Metal-Build (thumbv7em-none-eabihf)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust installieren
+        run: rustup toolchain install stable --profile minimal --target thumbv7em-none-eabihf && rustup default stable
+      - name: neuronws-layers in allen Feature-Kombinationen
+        run: |
+          for features in "" "libm" "alloc" "alloc,libm"; do
+            echo "== neuronws-layers (${features:-keine Features})"
+            cargo build -p neuronws-layers --no-default-features --features "$features" --target thumbv7em-none-eabihf
+          done
+      - name: neuronws-perceptrons und neuronws-digits
+        run: |
+          cargo build -p neuronws-perceptrons --target thumbv7em-none-eabihf
+          cargo build -p neuronws-digits --no-default-features --target thumbv7em-none-eabihf
+          cargo build -p neuronws-digits --target thumbv7em-none-eabihf
+
+  # Das Programm in `mcu/` läuft wirklich ohne Betriebssystem, im Emulator QEMU (ein Cortex-M4F).
+  mcu:
+    name: Mikrocontroller-Emulator (QEMU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust und QEMU installieren
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy --target thumbv7em-none-eabihf
+          rustup default stable
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-arm
+      - run: scripts/mcu.sh

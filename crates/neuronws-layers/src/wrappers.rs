@@ -26,7 +26,7 @@ use crate::traits::Trainable;
 ///
 /// Verhindert, dass ein einzelner Ausreißer im Gradienten einen riesigen Sprung auslöst. Die
 /// Richtung kann sich dabei ändern, weil jeder Wert für sich begrenzt wird. Will man die Richtung
-/// behalten, ist [`ClipNorm`] besser. Braucht keine Mathe-Funktionen.
+/// behalten, ist `ClipNorm` besser. Braucht keine Mathe-Funktionen.
 #[derive(Debug, Clone)]
 pub struct ClipValue<O> {
     inner: O,
@@ -138,7 +138,7 @@ impl<T: Scalar, O: HasLearningRate<T>> HasLearningRate<T> for ClipNorm<O> {
 /// weniger an Rauschen an.
 ///
 /// Die Hülle wirkt auf **alle** Parameter, auch auf die Bias-Werte. Bei einfachem SGD ist das
-/// dasselbe wie "Weight Decay". Bei [`AdamW`](crate::adam::AdamW) gibt es dafür einen eigenen,
+/// dasselbe wie "Weight Decay". Bei `AdamW` gibt es dafür einen eigenen,
 /// entkoppelten Weg (`weight_decay`), der meistens besser ist. Hier zählt der Term wie ein
 /// normaler Gradient und geht durch die Adam-Skalierung. Braucht keine Mathe-Funktionen.
 #[derive(Debug, Clone)]

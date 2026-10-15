@@ -1,0 +1,24 @@
+[package]
+name = "neuronws-mcu"
+version = "0.1.0"
+edition = "2024"
+description = "Lässt neuronws auf einem Cortex-M4F laufen, ohne Betriebssystem, ohne std und ohne alloc."
+publish = false
+
+# Ein eigener Workspace, getrennt vom Rest des Projekts: Dieses Programm braucht `unsafe` für den
+# Startcode und die Ausgabe (Semihosting), und das ist im Hauptprojekt verboten.
+[workspace]
+
+[dependencies]
+# Ohne `std`, ohne `alloc`. Die Mathe-Funktionen (tanh, exp, ...) kommen aus `libm`.
+neuronws-layers = { path = "../crates/neuronws-layers", default-features = false, features = ["libm"] }
+neuronws-perceptrons = { path = "../crates/neuronws-perceptrons" }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = true
+codegen-units = 1
