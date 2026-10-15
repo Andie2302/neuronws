@@ -14,16 +14,16 @@ unter **Entscheidungen** (ausführlicher in der [README](README.md)).
 
 - [ ] ! **Auf einem echten Mikrocontroller ausprobieren.** Das Testprogramm in [`mcu/`](mcu/README.md)
   läuft im Emulator QEMU auf einem Cortex-M4F und einem Cortex-M3 (ohne Betriebssystem, `std` und `alloc`,
-  Ergebnis bitgleich zum Rechner), aber auf echter Hardware noch nicht. Dafür fehlt ein Gerät. Was zu tun ist, steht in
-  `mcu/README.md`, Abschnitt "Auf einen echten Chip übertragen". **Bitte hier eintragen:** Chip, Takt und
-  die Zeile `Flash belegt ... Stack benutzt ...` aus der Ausgabe.
-- [ ] **CI auf GitHub ansehen.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ist geschrieben
-  und lokal geprüft (die YAML-Datei ist gültig, und jeder Befehl daraus läuft lokal, zusammengefasst in
-  `scripts/check.sh`). Auf GitHub selbst ist sie noch nie gelaufen. Nach dem ersten Push im Reiter
-  *Actions* nachsehen, ob alle Jobs grün sind.
+  Ergebnis bitgleich zum Rechner), aber auf echter Hardware noch nicht. Dafür fehlt ein Gerät. Was zu
+  tun ist, steht in `mcu/README.md`, Abschnitt "Auf einen echten Chip übertragen". **Bitte hier
+  eintragen:** Chip, Takt und die Zeile `Flash belegt ... Stack benutzt ...` aus der Ausgabe.
 
 ### Ideen, die beim Abarbeiten aufgefallen sind
 
+- [ ] **Rust-Version festlegen** (`rust-toolchain.toml`, und `rust-version` in der `Cargo.toml`). Die CI nimmt
+  das neueste `stable`, und ein Rust-Update bringt manchmal neue Clippy-Warnungen, die die CI dann ohne
+  Änderung am Code rot färben (so geschehen mit `chunks_exact`, siehe unten). Mit einer festen Version
+  passiert das erst, wenn man selbst aktualisiert. Dagegen spricht: Man sieht neue Warnungen später.
 - [ ] **Aufmerksamkeit (Attention) und ein Transformer-Block.** `Residual`, `LayerNorm` und `Embedding`
   gibt es, `Attention` fehlt noch. Auch sie wäre eine Operation auf einer Folge fester Länge.
 - [ ] **`Concat` für U-Net-artige Netze.** `Residual`, `Fork` und `Add` stehen, aber Kanäle
@@ -101,7 +101,10 @@ Was beim Abarbeiten bewusst so entschieden wurde (die Gründe stehen in der READ
 - [x] **CI mit GitHub Actions** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): jede
   Feature-Kombination als eigener Job, Clippy mit `-D warnings`, Format, Dokumentation ohne Warnungen
   (auch je Kombination: Verweise auf Typen, die es ohne Feature nicht gibt, waren ein echter Fehler),
-  Bare-Metal-Build, alle Beispiele, Test im Mikrocontroller-Emulator. Lokal dasselbe: `scripts/check.sh`.
+  Bare-Metal-Builds für vier Prozessoren, alle Beispiele, Test im Mikrocontroller-Emulator. Lokal
+  dasselbe: `scripts/check.sh`. **Auf GitHub geprüft:** Der erste Lauf war rot, weil Clippy in Rust 1.99
+  `chunks_exact` mit fester Größe in der Faltung beanstandet (jetzt `as_chunks`). Der zweite Lauf war
+  grün, alle 14 Jobs.
 - [x] **Trainings- und Testdaten trennen, Early Stopping:** `data::train_test_split`,
   `shuffled_train_test_split`, `EarlyStopping`, `Trainer::fit_validated`.
 - [x] **Daten pro Runde mischen:** `Trainer::epoch_shuffled`, `fit_shuffled`.

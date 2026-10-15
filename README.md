@@ -313,7 +313,9 @@ Was bewusst so gebaut ist, und warum:
 | `scripts/mcu.sh` | Baut das Mikrocontroller-Programm für Cortex-M4F und Cortex-M3 und führt es in QEMU aus. |
 
 Die CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) macht dasselbe, jede Feature-Kombination
-als eigener Job. Die Bare-Metal-Builds (Cortex-M4F, M3, M0/M0+ und RISC-V) sind der eigentliche Beweis
+als eigener Job. Sie nimmt jeweils das **neueste `stable`**. Nach einem Rust-Update können deshalb neue
+Clippy-Warnungen auftauchen, die dann behoben gehören (so geschehen bei `chunks_exact`, das Clippy 1.99
+durch `as_chunks` ersetzt sehen will). Die Bare-Metal-Builds (Cortex-M4F, M3, M0/M0+ und RISC-V) sind der eigentliche Beweis
 für `no_std` ohne `alloc`: Dort gibt es keine `std` und keinen Heap, jede versehentliche Benutzung wäre
 ein Fehler.
 
