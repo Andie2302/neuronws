@@ -1,3 +1,4 @@
+use crate::random::Rng;
 use crate::traits::{
     BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
@@ -27,6 +28,21 @@ impl<const IN: usize, const OUT: usize> DenseLayer<IN, OUT> {
             grad_bias: [0.0; OUT],
             grad_input: [0.0; IN],
         }
+    }
+
+    /// Gewichte gleichverteilt in `[-limit, limit]`, Bias 0.
+    ///
+    /// Zufällige Startwerte sind nötig, damit die Neuronen einer Schicht nicht alle dasselbe lernen.
+    pub fn random(rng: &mut Rng, limit: f32) -> Self {
+        let weights =
+            core::array::from_fn(|_| core::array::from_fn(|_| rng.uniform(-limit, limit)));
+        Self::new(weights, [0.0; OUT])
+    }
+
+    /// Wie `random`, mit der Xavier-Grenze `√(6 / (IN + OUT))`.
+    #[cfg(any(feature = "std", feature = "libm"))]
+    pub fn xavier(rng: &mut Rng) -> Self {
+        Self::random(rng, crate::math::sqrt(6.0 / (IN + OUT) as f32))
     }
 
     pub const fn weights(&self) -> &[[f32; IN]; OUT] {

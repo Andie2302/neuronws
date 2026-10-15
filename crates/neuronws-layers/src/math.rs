@@ -21,3 +21,13 @@ pub fn exp(x: f32) -> f32 {
 pub fn tanh(x: f32) -> f32 {
     libm::tanhf(x)
 }
+
+#[cfg(feature = "std")]
+pub fn sqrt(x: f32) -> f32 {
+    x.sqrt()
+}
+
+#[cfg(all(feature = "libm", not(feature = "std")))]
+pub fn sqrt(x: f32) -> f32 {
+    libm::sqrtf(x)
+}

@@ -7,4 +7,5 @@ pub mod loss;
 #[cfg(any(feature = "std", feature = "libm"))]
 mod math;
 pub mod optimizer;
+pub mod random;
 pub mod traits;

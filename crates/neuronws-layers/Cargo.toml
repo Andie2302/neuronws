@@ -15,3 +15,7 @@ libm = { version = "0.2", optional = true }
 [[example]]
 name = "learn_xor_sigmoid"
 required-features = ["libm"]
+
+[[example]]
+name = "xor_seeds"
+required-features = ["libm"]
