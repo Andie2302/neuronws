@@ -7,6 +7,14 @@ use crate::scalar::Scalar;
 pub trait Activation {
     fn apply<T: Scalar>(&self, z: T) -> T;
     fn derivative<T: Scalar>(&self, z: T) -> T;
+
+    /// Wie `derivative`, bekommt aber zusätzlich das schon bekannte Ergebnis `y = φ(z)`.
+    ///
+    /// Bei Sigmoid und Tanh lässt sich die Ableitung aus `y` berechnen, ohne `exp` oder `tanh`
+    /// noch einmal aufzurufen. Der Standard ignoriert `y`.
+    fn derivative_with_output<T: Scalar>(&self, z: T, _y: T) -> T {
+        self.derivative(z)
+    }
 }
 
 /// φ(z) = z
@@ -69,7 +77,10 @@ impl Activation for Sigmoid {
 
     /// φ'(z) = φ(z) · (1 − φ(z))
     fn derivative<T: Scalar>(&self, z: T) -> T {
-        let y = self.apply(z);
+        self.derivative_with_output(z, self.apply(z))
+    }
+
+    fn derivative_with_output<T: Scalar>(&self, _z: T, y: T) -> T {
         y * (T::ONE - y)
     }
 }
@@ -89,7 +100,10 @@ impl Activation for Tanh {
 
     /// φ'(z) = 1 − tanh²(z)
     fn derivative<T: Scalar>(&self, z: T) -> T {
-        let y = self.apply(z);
+        self.derivative_with_output(z, self.apply(z))
+    }
+
+    fn derivative_with_output<T: Scalar>(&self, _z: T, y: T) -> T {
         T::ONE - y * y
     }
 }

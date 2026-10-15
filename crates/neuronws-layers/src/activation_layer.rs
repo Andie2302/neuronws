@@ -53,13 +53,14 @@ impl<const N: usize, A: Activation, T: Scalar> BackwardData for ActivationLayer<
 impl<const N: usize, A: Activation, T: Scalar> BackwardPathMut for ActivationLayer<N, A, T> {
     /// Kettenregel elementweise: `∂L/∂z[i] = g[i] · φ'(z[i])`.
     fn backward_mut(&mut self, grad_output: &Self::BackwardInput) -> &Self::BackwardOutput {
-        for ((grad_z, &g), &z) in self
+        for (((grad_z, &g), &z), &y) in self
             .grad_input
             .iter_mut()
             .zip(grad_output)
             .zip(&self.last_input)
+            .zip(&self.output)
         {
-            *grad_z = g * self.activation.derivative(z);
+            *grad_z = g * self.activation.derivative_with_output(z, y);
         }
         &self.grad_input
     }
