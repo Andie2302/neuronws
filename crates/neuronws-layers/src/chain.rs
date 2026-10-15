@@ -1,4 +1,6 @@
-use crate::traits::{Data, ForwardData, ForwardPath, Layer};
+use crate::traits::{
+    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer,
+};
 
 /// Hintereinanderschaltung zweier Schichten: die Ausgabe von `first` ist die Eingabe von `second`.
 ///
@@ -48,6 +50,40 @@ where
 {
     fn forward(&self, input: &Self::ForwardInput) -> Self::ForwardOutput {
         self.second.forward(&self.first.forward(input))
+    }
+}
+
+impl<A, B> ForwardPathMut for Chain<A, B>
+where
+    A: ForwardPathMut,
+    B: ForwardPathMut<ForwardInput = A::ForwardOutput>,
+{
+    /// Reicht die Referenz auf den Ausgabepuffer von `first` direkt an `second` weiter, ohne Kopie.
+    fn forward_mut(&mut self, input: &Self::ForwardInput) -> &Self::ForwardOutput {
+        let mid = self.first.forward_mut(input);
+        self.second.forward_mut(mid)
+    }
+}
+
+/// Rückwärts ist die Reihenfolge gespiegelt: Der Gradient fließt erst durch `second`, dann durch
+/// `first`. Der Gradient bezüglich der Eingabe von `second` ist der bezüglich der Ausgabe von `first`.
+impl<A, B> BackwardData for Chain<A, B>
+where
+    A: BackwardData,
+    B: BackwardData<BackwardOutput = A::BackwardInput>,
+{
+    type BackwardInput = B::BackwardInput;
+    type BackwardOutput = A::BackwardOutput;
+}
+
+impl<A, B> BackwardPathMut for Chain<A, B>
+where
+    A: BackwardPathMut,
+    B: BackwardPathMut<BackwardOutput = A::BackwardInput>,
+{
+    fn backward_mut(&mut self, grad_output: &Self::BackwardInput) -> &Self::BackwardOutput {
+        let mid = self.second.backward_mut(grad_output);
+        self.first.backward_mut(mid)
     }
 }
 

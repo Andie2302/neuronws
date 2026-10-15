@@ -16,7 +16,7 @@ pub trait ForwardPath: ForwardData {
 }
 
 pub trait ForwardPathMut: ForwardData {
-    fn forward_mut(&mut self, input: &Self::ForwardInput) -> &mut Self::ForwardOutput;
+    fn forward_mut(&mut self, input: &Self::ForwardInput) -> &Self::ForwardOutput;
 }
 
 pub trait BackwardPath: BackwardData {
@@ -24,5 +24,5 @@ pub trait BackwardPath: BackwardData {
 }
 
 pub trait BackwardPathMut: BackwardData {
-    fn backward_mut(&mut self, input: &Self::BackwardInput) -> &mut Self::BackwardOutput;
+    fn backward_mut(&mut self, input: &Self::BackwardInput) -> &Self::BackwardOutput;
 }

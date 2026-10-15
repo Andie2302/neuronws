@@ -4,7 +4,7 @@
 //! dass man es kaum falsch machen kann.
 
 use neuronws_layers::dense_layer::DenseLayer;
-use neuronws_layers::traits::ForwardPath;
+use neuronws_layers::traits::{BackwardPathMut, ForwardPath, ForwardPathMut};
 
 const W: [[f32; 2]; 3] = [[0.5, -1.0], [2.0, 0.3], [-0.7, 1.1]];
 const B: [f32; 3] = [0.1, -0.2, 0.3];
@@ -38,7 +38,7 @@ fn assert_close(analytic: f32, numeric: f32, what: &str) {
 fn run_backward(layer: &mut DenseLayer<2, 3>) -> [f32; 2] {
     let y = layer.forward_mut(&X);
     let grad_output = core::array::from_fn(|j| y[j] - TARGET[j]);
-    layer.backward_mut(&grad_output)
+    *layer.backward_mut(&grad_output)
 }
 
 #[test]
