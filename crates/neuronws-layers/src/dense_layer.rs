@@ -21,17 +21,12 @@ impl<const IN: usize, const OUT: usize> ForwardData for DenseLayer<IN, OUT> {
 }
 
 impl<const IN: usize, const OUT: usize> ForwardPath for DenseLayer<IN, OUT> {
-    /// Naiv: y[j] = Σ_i W[j][i] * x[i] + b[j], noch ohne Aktivierung.
+    /// y[j] = Σ_i W[j][i] * x[i] + b[j], noch ohne Aktivierung.
     fn forward(&self, input: &Self::ForwardInput) -> Self::ForwardOutput {
-        let mut output = [0.0; OUT];
-        for j in 0..OUT {
-            let mut sum = self.bias[j];
-            for i in 0..IN {
-                sum += self.weights[j][i] * input[i];
-            }
-            output[j] = sum;
-        }
-        output
+        core::array::from_fn(|j| {
+            let dot: f32 = self.weights[j].iter().zip(input).map(|(w, x)| w * x).sum();
+            dot + self.bias[j]
+        })
     }
 }
 
