@@ -4,7 +4,7 @@
 
 use neuronws_layers::activation::Step;
 use neuronws_layers::activation_layer::ActivationLayer;
-use neuronws_layers::chain::Chain;
+use neuronws_layers::chain::LayerExt;
 use neuronws_layers::dense_layer::DenseLayer;
 use neuronws_layers::traits::ForwardPath;
 
@@ -13,10 +13,7 @@ fn perceptron(
     weights: [f32; 2],
     bias: f32,
 ) -> impl ForwardPath<ForwardInput = [f32; 2], ForwardOutput = [f32; 1]> {
-    Chain::new(
-        DenseLayer::new([weights], [bias]),
-        ActivationLayer::<1, _>::new(Step),
-    )
+    DenseLayer::new([weights], [bias]).then(ActivationLayer::<1, _>::new(Step))
 }
 
 fn print_table(

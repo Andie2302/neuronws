@@ -6,22 +6,17 @@
 
 use neuronws_layers::activation::Step;
 use neuronws_layers::activation_layer::ActivationLayer;
-use neuronws_layers::chain::Chain;
+use neuronws_layers::chain::LayerExt;
 use neuronws_layers::dense_layer::DenseLayer;
 use neuronws_layers::traits::ForwardPath;
 
 fn main() {
     // Verborgene Schicht: Neuron 0 = OR, Neuron 1 = NAND
-    let hidden = Chain::new(
-        DenseLayer::new([[1.0, 1.0], [-1.0, -1.0]], [-0.5, 1.5]),
-        ActivationLayer::<2, _>::new(Step),
-    );
+    let hidden = DenseLayer::new([[1.0, 1.0], [-1.0, -1.0]], [-0.5, 1.5])
+        .then(ActivationLayer::<2, _>::new(Step));
     // Ausgabeschicht: AND der beiden verborgenen Werte
-    let output = Chain::new(
-        DenseLayer::new([[1.0, 1.0]], [-1.5]),
-        ActivationLayer::<1, _>::new(Step),
-    );
-    let xor = Chain::new(hidden, output);
+    let output = DenseLayer::new([[1.0, 1.0]], [-1.5]).then(ActivationLayer::<1, _>::new(Step));
+    let xor = hidden.then(output);
 
     println!("XOR");
     for a in [0.0, 1.0] {

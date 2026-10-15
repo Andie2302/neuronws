@@ -50,3 +50,23 @@ where
         self.second.forward(&self.first.forward(input))
     }
 }
+
+/// Erweiterung für jeden `Layer`: `a.then(b)` ist Kurzform für `Chain::new(a, b)`.
+///
+/// ```
+/// use neuronws_layers::activation::Relu;
+/// use neuronws_layers::activation_layer::ActivationLayer;
+/// use neuronws_layers::chain::LayerExt;
+/// use neuronws_layers::dense_layer::DenseLayer;
+/// use neuronws_layers::traits::ForwardPath;
+///
+/// let net = DenseLayer::new([[1.0, -1.0]], [0.0]).then(ActivationLayer::<1, _>::new(Relu));
+/// assert_eq!(net.forward(&[1.0, 3.0]), [0.0]);
+/// ```
+pub trait LayerExt: Layer + Sized {
+    fn then<B>(self, next: B) -> Chain<Self, B> {
+        Chain::new(self, next)
+    }
+}
+
+impl<T: Layer> LayerExt for T {}
