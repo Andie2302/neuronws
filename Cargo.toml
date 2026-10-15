@@ -1,7 +1,17 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = [
     "crates/*",
 ]
 
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
 [workspace.dependencies]
+libm = "0.2"
+neuronws-layers = { path = "crates/neuronws-layers" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"

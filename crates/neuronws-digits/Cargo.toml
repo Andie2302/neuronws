@@ -1,7 +1,20 @@
 [package]
 name = "neuronws-digits"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Das Netz braucht Mathe-Funktionen. Welche Quelle, entscheidet der Nutzer (siehe neuronws-layers).
+default = ["libm"]
+std = ["neuronws-layers/std"]
+libm = ["neuronws-layers/libm"]
 
 [dependencies]
-neuronws-layers = { path = "../neuronws-layers", features = ["libm"] }
+neuronws-layers = { workspace = true }
+
+[[example]]
+name = "recognize_digits"
+required-features = ["libm"]

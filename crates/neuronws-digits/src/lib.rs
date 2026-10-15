@@ -3,16 +3,19 @@
 //! Jede Ziffer ist ein Bild mit 5 Spalten und 7 Zeilen, also 35 Pixel. Ein Pixel ist 1.0
 //! (schwarz) oder 0.0 (weiß). Das Netz bekommt die 35 Werte und liefert 10 Wahrscheinlichkeiten,
 //! eine pro Ziffer.
+//!
+//! Das Netz braucht Mathe-Funktionen und ist deshalb nur mit dem Feature `std` oder `libm`
+//! da. Die Daten und das Messen gibt es immer.
 
 #![no_std]
 
-use neuronws_layers::activation::Tanh;
-use neuronws_layers::activation_layer::ActivationLayer;
-use neuronws_layers::chain::{Chain, LayerExt};
-use neuronws_layers::dense_layer::DenseLayer;
 use neuronws_layers::random::Rng;
-use neuronws_layers::softmax_layer::SoftmaxLayer;
 use neuronws_layers::traits::ForwardPath;
+
+#[cfg(any(feature = "std", feature = "libm"))]
+mod network;
+#[cfg(any(feature = "std", feature = "libm"))]
+pub use network::{HIDDEN, Network, new_network};
 
 pub const WIDTH: usize = 5;
 pub const HEIGHT: usize = 7;
@@ -142,23 +145,4 @@ where
         .filter(|(image, label)| argmax(&model.forward(image)) == argmax(label))
         .count();
     correct as f32 / data.len() as f32
-}
-
-/// 35 Pixel → 16 verborgene Neuronen (Tanh) → 10 Ziffern (Softmax).
-pub type Network = Chain<
-    Chain<
-        Chain<DenseLayer<PIXELS, HIDDEN>, ActivationLayer<HIDDEN, Tanh>>,
-        DenseLayer<HIDDEN, CLASSES>,
-    >,
-    SoftmaxLayer<CLASSES>,
->;
-
-pub const HIDDEN: usize = 16;
-
-/// Ein neues Netz mit zufälligen Startgewichten (Xavier).
-pub fn new_network(rng: &mut Rng) -> Network {
-    DenseLayer::<PIXELS, HIDDEN>::xavier(rng)
-        .then(ActivationLayer::<HIDDEN, _>::new(Tanh))
-        .then(DenseLayer::<HIDDEN, CLASSES>::xavier(rng))
-        .then(SoftmaxLayer::<CLASSES>::new())
 }

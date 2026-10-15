@@ -2,8 +2,9 @@ use core::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 
 /// Ein Zahlentyp, mit dem die Schichten rechnen: `f32` oder `f64`.
 ///
-/// `exp`, `tanh` und `sqrt` gibt es in `core` nicht. Sie sind nur mit dem Feature `std`
-/// (dann aus `std`) oder `libm` (dann aus `libm`) verfügbar.
+/// `exp`, `tanh`, `sqrt` und `ln` gibt es in `core` nicht. Sie sind nur mit dem Feature `std`
+/// (dann aus `std`) oder `libm` (dann aus `libm`) verfügbar. Sind beide Features an, gewinnt
+/// `libm`.
 pub trait Scalar:
     Copy
     + PartialOrd
@@ -45,38 +46,38 @@ impl Scalar for f32 {
         value as f32
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "libm")))]
     fn exp(self) -> Self {
         f32::exp(self)
     }
-    #[cfg(all(feature = "libm", not(feature = "std")))]
+    #[cfg(feature = "libm")]
     fn exp(self) -> Self {
         libm::expf(self)
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "libm")))]
     fn tanh(self) -> Self {
         f32::tanh(self)
     }
-    #[cfg(all(feature = "libm", not(feature = "std")))]
+    #[cfg(feature = "libm")]
     fn tanh(self) -> Self {
         libm::tanhf(self)
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "libm")))]
     fn sqrt(self) -> Self {
         f32::sqrt(self)
     }
-    #[cfg(all(feature = "libm", not(feature = "std")))]
+    #[cfg(feature = "libm")]
     fn sqrt(self) -> Self {
         libm::sqrtf(self)
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "libm")))]
     fn ln(self) -> Self {
         f32::ln(self)
     }
-    #[cfg(all(feature = "libm", not(feature = "std")))]
+    #[cfg(feature = "libm")]
     fn ln(self) -> Self {
         libm::logf(self)
     }
@@ -95,38 +96,38 @@ impl Scalar for f64 {
         value as f64
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "libm")))]
     fn exp(self) -> Self {
         f64::exp(self)
     }
-    #[cfg(all(feature = "libm", not(feature = "std")))]
+    #[cfg(feature = "libm")]
     fn exp(self) -> Self {
         libm::exp(self)
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "libm")))]
     fn tanh(self) -> Self {
         f64::tanh(self)
     }
-    #[cfg(all(feature = "libm", not(feature = "std")))]
+    #[cfg(feature = "libm")]
     fn tanh(self) -> Self {
         libm::tanh(self)
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "libm")))]
     fn sqrt(self) -> Self {
         f64::sqrt(self)
     }
-    #[cfg(all(feature = "libm", not(feature = "std")))]
+    #[cfg(feature = "libm")]
     fn sqrt(self) -> Self {
         libm::sqrt(self)
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "libm")))]
     fn ln(self) -> Self {
         f64::ln(self)
     }
-    #[cfg(all(feature = "libm", not(feature = "std")))]
+    #[cfg(feature = "libm")]
     fn ln(self) -> Self {
         libm::log(self)
     }

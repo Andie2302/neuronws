@@ -1,16 +1,22 @@
 [package]
 name = "neuronws-layers"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
 
 [features]
 default = []
-# Mathe-Funktionen wie `exp` kommen aus `std`, oder ohne `std` aus `libm`.
+# Mathe-Funktionen wie `exp`, `tanh`, `ln` und `sqrt` gibt es in `core` nicht.
+# Sie sind nur mit `std` (aus der Standardbibliothek) oder `libm` verfügbar.
+# Sind beide Features an, gewinnt `libm`: Dann rechnet jede Plattform mit demselben Code
+# und bekommt dieselben Ergebnisse.
 std = []
 libm = ["dep:libm"]
 
 [dependencies]
-libm = { version = "0.2", optional = true }
+libm = { workspace = true, optional = true }
 
 [[example]]
 name = "learn_xor_sigmoid"
