@@ -75,7 +75,9 @@ fn a_cloned_rng_continues_with_the_same_sequence() {
 fn debug_output_names_the_type_and_shows_its_values() {
     let layer = DenseLayer::<1, 1, f32>::new([[1.5]], [0.25]);
     let text = format!("{layer:?}");
-    assert!(text.starts_with("DenseLayer"), "{text}");
+    // Ein DenseLayer ist ein Block um die Operation `Linear`; die Ausgabe nennt beides.
+    assert!(text.starts_with("Block"), "{text}");
+    assert!(text.contains("Linear"), "{text}");
     assert!(text.contains("1.5") && text.contains("0.25"), "{text}");
 
     assert!(format!("{:?}", Sgd::new(0.1_f32)).contains("learning_rate"));

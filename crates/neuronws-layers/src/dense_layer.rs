@@ -1,35 +1,80 @@
+use core::marker::PhantomData;
+
+use crate::block::{Block, Operation};
+use crate::init::Initializer;
+#[cfg(any(feature = "std", feature = "libm"))]
+use crate::init::Xavier;
 use crate::random::Rng;
 use crate::scalar::Scalar;
-use crate::traits::{
-    BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
-};
 
-#[derive(Debug, Clone)]
-pub struct DenseLayer<const IN: usize, const OUT: usize, T: Scalar = f32> {
-    weights: [[T; IN]; OUT],
-    bias: [T; OUT],
-    /// Die Eingabe des letzten `forward_mut`, der Backward-Pass braucht sie für `∂L/∂W`.
-    last_input: [T; IN],
-    /// Die Ausgabe des letzten `forward_mut`, wird als Referenz zurückgegeben.
-    output: [T; OUT],
-    /// Aufsummierte Gradienten, bis `zero_grad` sie zurücksetzt.
-    grad_weights: [[T; IN]; OUT],
-    grad_bias: [T; OUT],
-    /// Der Gradient für den Vorgänger, wird als Referenz zurückgegeben.
-    grad_input: [T; IN],
+/// Die lineare Abbildung `y = W·x + b` von `IN` Eingängen auf `OUT` Neuronen.
+///
+/// Die Parameter sind die Gewichte (`OUT` Zeilen zu je `IN` Werten) und der Bias (`OUT` Werte).
+/// `weights[j]` ist die Gewichtszeile des Neurons `j`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Linear<const IN: usize, const OUT: usize, T: Scalar = f32>(PhantomData<T>);
+
+impl<const IN: usize, const OUT: usize, T: Scalar> Linear<IN, OUT, T> {
+    pub const fn new() -> Self {
+        Self(PhantomData)
+    }
 }
 
-impl<const IN: usize, const OUT: usize, T: Scalar> DenseLayer<IN, OUT, T> {
-    pub const fn new(weights: [[T; IN]; OUT], bias: [T; OUT]) -> Self {
-        Self {
-            weights,
-            bias,
-            last_input: [T::ZERO; IN],
-            output: [T::ZERO; OUT],
-            grad_weights: [[T::ZERO; IN]; OUT],
-            grad_bias: [T::ZERO; OUT],
-            grad_input: [T::ZERO; IN],
+impl<const IN: usize, const OUT: usize, T: Scalar> Operation for Linear<IN, OUT, T> {
+    type Scalar = T;
+    type Input = [T; IN];
+    type Output = [T; OUT];
+    type Params = ([[T; IN]; OUT], [T; OUT]);
+
+    /// y[j] = Σ_i W[j][i] * x[i] + b[j]
+    fn forward(&self, (weights, bias): &Self::Params, input: &Self::Input) -> Self::Output {
+        core::array::from_fn(|j| {
+            let dot = weights[j]
+                .iter()
+                .zip(input)
+                .fold(T::ZERO, |sum, (&w, &x)| sum + w * x);
+            dot + bias[j]
+        })
+    }
+
+    /// `∂L/∂W[j][i] = g[j] · x[i]`, `∂L/∂b[j] = g[j]`, `∂L/∂x[i] = Σ_j W[j][i] · g[j]`
+    fn backward(
+        &self,
+        (weights, _): &Self::Params,
+        (grad_weights, grad_bias): &mut Self::Params,
+        input: &Self::Input,
+        _output: &Self::Output,
+        grad_output: &Self::Output,
+    ) -> Self::Input {
+        for (j, &g) in grad_output.iter().enumerate() {
+            grad_bias[j] += g;
+            for (grad_w, &x) in grad_weights[j].iter_mut().zip(input) {
+                *grad_w += g * x;
+            }
         }
+
+        core::array::from_fn(|i| {
+            weights
+                .iter()
+                .zip(grad_output)
+                .fold(T::ZERO, |sum, (row, &g)| sum + row[i] * g)
+        })
+    }
+
+    /// Gewichte aus dem `Initializer`, Bias 0.
+    fn init_params<I: Initializer>(&self, initializer: &I, rng: &mut Rng) -> Self::Params {
+        let weights =
+            core::array::from_fn(|_| core::array::from_fn(|_| initializer.sample(rng, IN, OUT)));
+        (weights, [T::ZERO; OUT])
+    }
+}
+
+/// Voll verbundene Schicht: `OUT` Neuronen, die alle `IN` Eingänge sehen.
+pub type DenseLayer<const IN: usize, const OUT: usize, T = f32> = Block<Linear<IN, OUT, T>>;
+
+impl<const IN: usize, const OUT: usize, T: Scalar> Block<Linear<IN, OUT, T>> {
+    pub fn new(weights: [[T; IN]; OUT], bias: [T; OUT]) -> Self {
+        Self::from_parts(Linear::new(), (weights, bias))
     }
 
     /// Gewichte gleichverteilt in `[-limit, limit]`, Bias 0.
@@ -45,101 +90,22 @@ impl<const IN: usize, const OUT: usize, T: Scalar> DenseLayer<IN, OUT, T> {
     /// Wie `random`, mit der Xavier-Grenze `√(6 / (IN + OUT))`.
     #[cfg(any(feature = "std", feature = "libm"))]
     pub fn xavier(rng: &mut Rng) -> Self {
-        Self::random(rng, (T::from_f32(6.0) / T::from_usize(IN + OUT)).sqrt())
+        Self::initialized(Linear::new(), &Xavier, rng)
     }
 
     pub const fn weights(&self) -> &[[T; IN]; OUT] {
-        &self.weights
+        &self.params().0
     }
 
     pub const fn bias(&self) -> &[T; OUT] {
-        &self.bias
+        &self.params().1
     }
 
     pub const fn grad_weights(&self) -> &[[T; IN]; OUT] {
-        &self.grad_weights
+        &self.grads().0
     }
 
     pub const fn grad_bias(&self) -> &[T; OUT] {
-        &self.grad_bias
-    }
-}
-
-impl<const IN: usize, const OUT: usize, T: Scalar> Layer for DenseLayer<IN, OUT, T> {}
-
-impl<const IN: usize, const OUT: usize, T: Scalar> ForwardData for DenseLayer<IN, OUT, T> {
-    type ForwardInput = [T; IN];
-    type ForwardOutput = [T; OUT];
-}
-
-impl<const IN: usize, const OUT: usize, T: Scalar> ForwardPath for DenseLayer<IN, OUT, T> {
-    /// y[j] = Σ_i W[j][i] * x[i] + b[j], noch ohne Aktivierung.
-    fn forward(&self, input: &Self::ForwardInput) -> Self::ForwardOutput {
-        core::array::from_fn(|j| {
-            let dot = self.weights[j]
-                .iter()
-                .zip(input)
-                .fold(T::ZERO, |sum, (&w, &x)| sum + w * x);
-            dot + self.bias[j]
-        })
-    }
-}
-
-impl<const IN: usize, const OUT: usize, T: Scalar> ForwardPathMut for DenseLayer<IN, OUT, T> {
-    /// Wie `forward`, merkt sich aber Ein- und Ausgabe.
-    fn forward_mut(&mut self, input: &Self::ForwardInput) -> &Self::ForwardOutput {
-        self.last_input = *input;
-        self.output = self.forward(input);
-        &self.output
-    }
-}
-
-impl<const IN: usize, const OUT: usize, T: Scalar> BackwardData for DenseLayer<IN, OUT, T> {
-    /// Gradient bezüglich der Ausgabe, `∂L/∂y`.
-    type BackwardInput = [T; OUT];
-    /// Gradient bezüglich der Eingabe, `∂L/∂x`.
-    type BackwardOutput = [T; IN];
-}
-
-impl<const IN: usize, const OUT: usize, T: Scalar> BackwardPathMut for DenseLayer<IN, OUT, T> {
-    /// Addiert die Parameter-Gradienten zu den bisherigen und liefert `∂L/∂x`:
-    /// `∂L/∂W[j][i] = g[j] · x[i]`, `∂L/∂b[j] = g[j]`, `∂L/∂x[i] = Σ_j W[j][i] · g[j]`.
-    fn backward_mut(&mut self, grad_output: &Self::BackwardInput) -> &Self::BackwardOutput {
-        for (j, &g) in grad_output.iter().enumerate() {
-            self.grad_bias[j] += g;
-            for (grad_w, &x) in self.grad_weights[j].iter_mut().zip(&self.last_input) {
-                *grad_w += g * x;
-            }
-        }
-
-        self.grad_input = core::array::from_fn(|i| {
-            self.weights
-                .iter()
-                .zip(grad_output)
-                .fold(T::ZERO, |sum, (row, &g)| sum + row[i] * g)
-        });
-        &self.grad_input
-    }
-}
-
-impl<const IN: usize, const OUT: usize, T: Scalar> Trainable for DenseLayer<IN, OUT, T> {
-    type Scalar = T;
-
-    const PARAMETER_COUNT: usize = IN * OUT + OUT;
-
-    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut T, T)) {
-        for (row, grad_row) in self.weights.iter_mut().zip(&self.grad_weights) {
-            for (w, &g) in row.iter_mut().zip(grad_row) {
-                visitor(w, g);
-            }
-        }
-        for (b, &g) in self.bias.iter_mut().zip(&self.grad_bias) {
-            visitor(b, g);
-        }
-    }
-
-    fn zero_grad(&mut self) {
-        self.grad_weights = [[T::ZERO; IN]; OUT];
-        self.grad_bias = [T::ZERO; OUT];
+        &self.grads().1
     }
 }

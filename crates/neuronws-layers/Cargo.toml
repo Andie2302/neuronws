@@ -33,3 +33,7 @@ required-features = ["libm"]
 [[example]]
 name = "learn_with_trainer"
 required-features = ["libm"]
+
+[[example]]
+name = "build_your_own_layer"
+required-features = ["libm"]

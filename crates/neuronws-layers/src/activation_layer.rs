@@ -1,79 +1,59 @@
-use crate::activation::Activation;
-use crate::scalar::Scalar;
-use crate::traits::{
-    BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
-};
+use core::marker::PhantomData;
 
-/// Wendet eine Aktivierungsfunktion elementweise auf `N` Werte an.
-#[derive(Debug, Clone)]
-pub struct ActivationLayer<const N: usize, A: Activation, T: Scalar = f32> {
+use crate::activation::Activation;
+use crate::block::{Block, Operation};
+use crate::init::Initializer;
+use crate::random::Rng;
+use crate::scalar::Scalar;
+
+/// Wendet eine Aktivierungsfunktion elementweise auf `N` Werte an. Hat keine Parameter.
+#[derive(Debug, Clone, Copy)]
+pub struct Elementwise<const N: usize, A: Activation, T: Scalar = f32> {
     activation: A,
-    /// Die Eingabe `z` des letzten `forward_mut`, die Ableitung `φ'(z)` braucht sie.
-    last_input: [T; N],
-    output: [T; N],
-    grad_input: [T; N],
+    scalar: PhantomData<T>,
 }
 
-impl<const N: usize, A: Activation, T: Scalar> ActivationLayer<N, A, T> {
+impl<const N: usize, A: Activation, T: Scalar> Elementwise<N, A, T> {
     pub const fn new(activation: A) -> Self {
         Self {
             activation,
-            last_input: [T::ZERO; N],
-            output: [T::ZERO; N],
-            grad_input: [T::ZERO; N],
+            scalar: PhantomData,
         }
     }
 }
 
-impl<const N: usize, A: Activation, T: Scalar> Layer for ActivationLayer<N, A, T> {}
+impl<const N: usize, A: Activation, T: Scalar> Operation for Elementwise<N, A, T> {
+    type Scalar = T;
+    type Input = [T; N];
+    type Output = [T; N];
+    type Params = ();
 
-impl<const N: usize, A: Activation, T: Scalar> ForwardData for ActivationLayer<N, A, T> {
-    type ForwardInput = [T; N];
-    type ForwardOutput = [T; N];
-}
-
-impl<const N: usize, A: Activation, T: Scalar> ForwardPath for ActivationLayer<N, A, T> {
-    fn forward(&self, input: &Self::ForwardInput) -> Self::ForwardOutput {
+    fn forward(&self, _params: &(), input: &Self::Input) -> Self::Output {
         input.map(|z| self.activation.apply(z))
     }
-}
 
-impl<const N: usize, A: Activation, T: Scalar> ForwardPathMut for ActivationLayer<N, A, T> {
-    fn forward_mut(&mut self, input: &Self::ForwardInput) -> &Self::ForwardOutput {
-        self.last_input = *input;
-        self.output = self.forward(input);
-        &self.output
-    }
-}
-
-impl<const N: usize, A: Activation, T: Scalar> BackwardData for ActivationLayer<N, A, T> {
-    type BackwardInput = [T; N];
-    type BackwardOutput = [T; N];
-}
-
-impl<const N: usize, A: Activation, T: Scalar> BackwardPathMut for ActivationLayer<N, A, T> {
     /// Kettenregel elementweise: `∂L/∂z[i] = g[i] · φ'(z[i])`.
-    fn backward_mut(&mut self, grad_output: &Self::BackwardInput) -> &Self::BackwardOutput {
-        for (((grad_z, &g), &z), &y) in self
-            .grad_input
-            .iter_mut()
-            .zip(grad_output)
-            .zip(&self.last_input)
-            .zip(&self.output)
-        {
-            *grad_z = g * self.activation.derivative_with_output(z, y);
-        }
-        &self.grad_input
+    fn backward(
+        &self,
+        _params: &(),
+        _grads: &mut (),
+        input: &Self::Input,
+        output: &Self::Output,
+        grad_output: &Self::Output,
+    ) -> Self::Input {
+        core::array::from_fn(|i| {
+            grad_output[i] * self.activation.derivative_with_output(input[i], output[i])
+        })
     }
+
+    fn init_params<I: Initializer>(&self, _initializer: &I, _rng: &mut Rng) {}
 }
 
-/// Die Aktivierungsschicht hat keine lernbaren Parameter, es gibt also nichts zu besuchen.
-impl<const N: usize, A: Activation, T: Scalar> Trainable for ActivationLayer<N, A, T> {
-    type Scalar = T;
+/// Eine Aktivierungsschicht: wendet `φ` auf jeden der `N` Werte an.
+pub type ActivationLayer<const N: usize, A, T = f32> = Block<Elementwise<N, A, T>>;
 
-    const PARAMETER_COUNT: usize = 0;
-
-    fn visit_parameters(&mut self, _visitor: &mut impl FnMut(&mut T, T)) {}
-
-    fn zero_grad(&mut self) {}
+impl<const N: usize, A: Activation, T: Scalar> Block<Elementwise<N, A, T>> {
+    pub fn new(activation: A) -> Self {
+        Self::from_parts(Elementwise::new(activation), ())
+    }
 }

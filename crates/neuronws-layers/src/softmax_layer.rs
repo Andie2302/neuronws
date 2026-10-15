@@ -1,45 +1,33 @@
+use core::marker::PhantomData;
+
+use crate::block::{Block, Operation};
+use crate::init::Initializer;
+use crate::random::Rng;
 use crate::scalar::Scalar;
-use crate::traits::{
-    BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
-};
 
 /// Macht aus `N` beliebigen Werten eine Wahrscheinlichkeitsverteilung: `y[i] = e^z[i] / Σ_j e^z[j]`.
 ///
 /// Alle Ausgaben liegen in (0, 1) und summieren sich zu 1. Anders als eine elementweise
-/// Aktivierung hängt jede Ausgabe von allen Eingaben ab, deshalb ist Softmax eine eigene Schicht.
+/// Aktivierung hängt jede Ausgabe von allen Eingaben ab, deshalb ist Softmax eine eigene Operation.
 /// Braucht `exp`, also das Feature `std` oder `libm`.
-#[derive(Debug, Clone)]
-pub struct SoftmaxLayer<const N: usize, T: Scalar = f32> {
-    output: [T; N],
-    grad_input: [T; N],
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Softmax<const N: usize, T: Scalar = f32>(PhantomData<T>);
 
-impl<const N: usize, T: Scalar> SoftmaxLayer<N, T> {
+impl<const N: usize, T: Scalar> Softmax<N, T> {
     pub const fn new() -> Self {
-        Self {
-            output: [T::ZERO; N],
-            grad_input: [T::ZERO; N],
-        }
+        Self(PhantomData)
     }
 }
 
-impl<const N: usize, T: Scalar> Default for SoftmaxLayer<N, T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl<const N: usize, T: Scalar> Operation for Softmax<N, T> {
+    type Scalar = T;
+    type Input = [T; N];
+    type Output = [T; N];
+    type Params = ();
 
-impl<const N: usize, T: Scalar> Layer for SoftmaxLayer<N, T> {}
-
-impl<const N: usize, T: Scalar> ForwardData for SoftmaxLayer<N, T> {
-    type ForwardInput = [T; N];
-    type ForwardOutput = [T; N];
-}
-
-impl<const N: usize, T: Scalar> ForwardPath for SoftmaxLayer<N, T> {
     /// Vor dem Potenzieren wird der größte Wert abgezogen. Das ändert das Ergebnis nicht,
     /// verhindert aber, dass `exp` bei großen Eingaben überläuft.
-    fn forward(&self, input: &Self::ForwardInput) -> Self::ForwardOutput {
+    fn forward(&self, _params: &(), input: &Self::Input) -> Self::Output {
         let max = input
             .iter()
             .copied()
@@ -48,48 +36,40 @@ impl<const N: usize, T: Scalar> ForwardPath for SoftmaxLayer<N, T> {
         let sum = exps.iter().fold(T::ZERO, |sum, &e| sum + e);
         exps.map(|e| e / sum)
     }
-}
 
-impl<const N: usize, T: Scalar> ForwardPathMut for SoftmaxLayer<N, T> {
-    fn forward_mut(&mut self, input: &Self::ForwardInput) -> &Self::ForwardOutput {
-        self.output = self.forward(input);
-        &self.output
-    }
-}
-
-impl<const N: usize, T: Scalar> BackwardData for SoftmaxLayer<N, T> {
-    type BackwardInput = [T; N];
-    type BackwardOutput = [T; N];
-}
-
-impl<const N: usize, T: Scalar> BackwardPathMut for SoftmaxLayer<N, T> {
     /// `∂L/∂z[i] = y[i] · (g[i] − Σ_j g[j] · y[j])`
     ///
     /// Das ist die Jacobi-Matrix von Softmax, angewandt auf `g`, ohne dass sie je als Matrix
     /// aufgebaut wird.
-    fn backward_mut(&mut self, grad_output: &Self::BackwardInput) -> &Self::BackwardOutput {
+    fn backward(
+        &self,
+        _params: &(),
+        _grads: &mut (),
+        _input: &Self::Input,
+        output: &Self::Output,
+        grad_output: &Self::Output,
+    ) -> Self::Input {
         let weighted = grad_output
             .iter()
-            .zip(&self.output)
+            .zip(output)
             .fold(T::ZERO, |sum, (&g, &y)| sum + g * y);
-        for ((grad_z, &g), &y) in self
-            .grad_input
-            .iter_mut()
-            .zip(grad_output)
-            .zip(&self.output)
-        {
-            *grad_z = y * (g - weighted);
-        }
-        &self.grad_input
+        core::array::from_fn(|i| output[i] * (grad_output[i] - weighted))
+    }
+
+    fn init_params<I: Initializer>(&self, _initializer: &I, _rng: &mut Rng) {}
+}
+
+/// Softmax als Schicht.
+pub type SoftmaxLayer<const N: usize, T = f32> = Block<Softmax<N, T>>;
+
+impl<const N: usize, T: Scalar> Block<Softmax<N, T>> {
+    pub fn new() -> Self {
+        Self::from_parts(Softmax::new(), ())
     }
 }
 
-impl<const N: usize, T: Scalar> Trainable for SoftmaxLayer<N, T> {
-    type Scalar = T;
-
-    const PARAMETER_COUNT: usize = 0;
-
-    fn visit_parameters(&mut self, _visitor: &mut impl FnMut(&mut T, T)) {}
-
-    fn zero_grad(&mut self) {}
+impl<const N: usize, T: Scalar> Default for Block<Softmax<N, T>> {
+    fn default() -> Self {
+        Self::new()
+    }
 }

@@ -16,7 +16,7 @@ pub struct Perceptron<const IN: usize, T: Scalar = f32> {
 }
 
 impl<const IN: usize, T: Scalar> Perceptron<IN, T> {
-    pub const fn new(weights: [T; IN], bias: T) -> Self {
+    pub fn new(weights: [T; IN], bias: T) -> Self {
         Self {
             neuron: DenseLayer::new([weights], [bias]),
         }

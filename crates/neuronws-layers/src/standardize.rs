@@ -1,7 +1,7 @@
+use crate::block::{Block, Operation};
+use crate::init::Initializer;
+use crate::random::Rng;
 use crate::scalar::Scalar;
-use crate::traits::{
-    BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
-};
 
 /// Standardisiert jede Eingabe einzeln: `x' = (x − Mittelwert) / Streuung`.
 ///
@@ -30,23 +30,47 @@ use crate::traits::{
 /// assert!(a.abs() < 1e-6 && b.abs() < 1e-6); // der Mittelwert wird zu 0
 /// # }
 /// ```
-#[derive(Debug, Clone)]
-pub struct Standardize<const N: usize, T: Scalar = f32> {
+/// Die Rechnung dazu: Mittelwert und Streuung sind feste Einstellungen der Operation, keine
+/// lernbaren Parameter.
+#[derive(Debug, Clone, Copy)]
+pub struct Standardization<const N: usize, T: Scalar = f32> {
     mean: [T; N],
     std_dev: [T; N],
-    output: [T; N],
-    grad_input: [T; N],
 }
 
-impl<const N: usize, T: Scalar> Standardize<N, T> {
+impl<const N: usize, T: Scalar> Operation for Standardization<N, T> {
+    type Scalar = T;
+    type Input = [T; N];
+    type Output = [T; N];
+    type Params = ();
+
+    fn forward(&self, _params: &(), input: &Self::Input) -> Self::Output {
+        core::array::from_fn(|i| (input[i] - self.mean[i]) / self.std_dev[i])
+    }
+
+    /// `∂L/∂x[i] = g[i] / Streuung[i]`
+    fn backward(
+        &self,
+        _params: &(),
+        _grads: &mut (),
+        _input: &Self::Input,
+        _output: &Self::Output,
+        grad_output: &Self::Output,
+    ) -> Self::Input {
+        core::array::from_fn(|i| grad_output[i] / self.std_dev[i])
+    }
+
+    fn init_params<I: Initializer>(&self, _initializer: &I, _rng: &mut Rng) {}
+}
+
+/// Standardisiert jede Eingabe einzeln, siehe [`Standardization`].
+pub type Standardize<const N: usize, T = f32> = Block<Standardization<N, T>>;
+
+impl<const N: usize, T: Scalar> Block<Standardization<N, T>> {
     /// Aus bekannter Statistik. Eine Streuung `≤ 0` (oder keine Zahl) wird wie 1 behandelt.
     pub fn from_statistics(mean: [T; N], std_dev: [T; N]) -> Self {
-        Self {
-            mean,
-            std_dev: std_dev.map(|s| if s > T::ZERO { s } else { T::ONE }),
-            output: [T::ZERO; N],
-            grad_input: [T::ZERO; N],
-        }
+        let std_dev = std_dev.map(|s| if s > T::ZERO { s } else { T::ONE });
+        Self::from_parts(Standardization { mean, std_dev }, ())
     }
 
     /// Berechnet Mittelwert und Streuung (der Lerndaten, geteilt durch ihre Anzahl) in einem Durchgang.
@@ -83,62 +107,11 @@ impl<const N: usize, T: Scalar> Standardize<N, T> {
     }
 
     pub const fn mean(&self) -> &[T; N] {
-        &self.mean
+        &self.operation().mean
     }
 
     /// Die Streuung, mit der geteilt wird (1 für Eingaben, die in den Lerndaten konstant waren).
     pub const fn std_dev(&self) -> &[T; N] {
-        &self.std_dev
+        &self.operation().std_dev
     }
-}
-
-impl<const N: usize, T: Scalar> Layer for Standardize<N, T> {}
-
-impl<const N: usize, T: Scalar> ForwardData for Standardize<N, T> {
-    type ForwardInput = [T; N];
-    type ForwardOutput = [T; N];
-}
-
-impl<const N: usize, T: Scalar> ForwardPath for Standardize<N, T> {
-    fn forward(&self, input: &Self::ForwardInput) -> Self::ForwardOutput {
-        core::array::from_fn(|i| (input[i] - self.mean[i]) / self.std_dev[i])
-    }
-}
-
-impl<const N: usize, T: Scalar> ForwardPathMut for Standardize<N, T> {
-    fn forward_mut(&mut self, input: &Self::ForwardInput) -> &Self::ForwardOutput {
-        self.output = self.forward(input);
-        &self.output
-    }
-}
-
-impl<const N: usize, T: Scalar> BackwardData for Standardize<N, T> {
-    type BackwardInput = [T; N];
-    type BackwardOutput = [T; N];
-}
-
-impl<const N: usize, T: Scalar> BackwardPathMut for Standardize<N, T> {
-    /// `∂L/∂x[i] = g[i] / Streuung[i]`
-    fn backward_mut(&mut self, grad_output: &Self::BackwardInput) -> &Self::BackwardOutput {
-        for ((grad_x, &g), &s) in self
-            .grad_input
-            .iter_mut()
-            .zip(grad_output)
-            .zip(&self.std_dev)
-        {
-            *grad_x = g / s;
-        }
-        &self.grad_input
-    }
-}
-
-/// Mittelwert und Streuung sind fest, es gibt nichts zu lernen.
-impl<const N: usize, T: Scalar> Trainable for Standardize<N, T> {
-    type Scalar = T;
-
-    const PARAMETER_COUNT: usize = 0;
-
-    fn visit_parameters(&mut self, _visitor: &mut impl FnMut(&mut T, T)) {}
-
-    fn zero_grad(&mut self) {}
 }
