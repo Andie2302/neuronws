@@ -37,27 +37,32 @@ impl<T: Scalar> Values<T> for () {
     }
 }
 
-impl<T: Scalar, const N: usize> Values<T> for [T; N] {
-    const LEN: usize = N;
+/// Eine einzelne Zahl ist eine Gruppe aus einem Wert. Das ist der Boden der Rekursion unten.
+impl<T: Scalar> Values<T> for T {
+    const LEN: usize = 1;
 
     fn zeros() -> Self {
-        [T::ZERO; N]
+        T::ZERO
     }
 
     fn value(&self, index: usize) -> T {
-        self[index]
+        assert!(index == 0, "Index {index} außerhalb von 1 Wert");
+        *self
     }
 
     fn value_mut(&mut self, index: usize) -> &mut T {
-        &mut self[index]
+        assert!(index == 0, "Index {index} außerhalb von 1 Wert");
+        self
     }
 }
 
-impl<T: Scalar, const COLUMNS: usize, const ROWS: usize> Values<T> for [[T; COLUMNS]; ROWS] {
-    const LEN: usize = COLUMNS * ROWS;
+/// Ein Array aus Gruppen ist selbst eine Gruppe, beliebig tief: `[T; N]` ist ein Vektor,
+/// `[[T; C]; R]` eine Matrix (zeilenweise), `[[[T; W]; H]; K]` ein Bild mit `K` Kanälen und so fort.
+impl<T: Scalar, V: Values<T>, const N: usize> Values<T> for [V; N] {
+    const LEN: usize = N * V::LEN;
 
     fn zeros() -> Self {
-        [[T::ZERO; COLUMNS]; ROWS]
+        [V::zeros(); N]
     }
 
     fn value(&self, index: usize) -> T {
@@ -66,7 +71,7 @@ impl<T: Scalar, const COLUMNS: usize, const ROWS: usize> Values<T> for [[T; COLU
             "Index {index} außerhalb von {} Werten",
             Self::LEN
         );
-        self[index / COLUMNS][index % COLUMNS]
+        self[index / V::LEN].value(index % V::LEN)
     }
 
     fn value_mut(&mut self, index: usize) -> &mut T {
@@ -75,7 +80,7 @@ impl<T: Scalar, const COLUMNS: usize, const ROWS: usize> Values<T> for [[T; COLU
             "Index {index} außerhalb von {} Werten",
             Self::LEN
         );
-        &mut self[index / COLUMNS][index % COLUMNS]
+        self[index / V::LEN].value_mut(index % V::LEN)
     }
 }
 
