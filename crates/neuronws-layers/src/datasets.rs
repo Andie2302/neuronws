@@ -62,8 +62,13 @@ pub const BLOB_CENTERS: [[f32; 2]; 3] = [[-2.0, -1.0], [2.0, -1.0], [0.0, 2.0]];
 pub type BlobSample = ([f32; 2], [f32; 3]);
 
 /// `N` Punkte in drei Wolken um [`BLOB_CENTERS`], je `N / 3` pro Klasse, gestreut um höchstens
-/// ±1,5. Die Reihenfolge ist gemischt, das Ziel ist der One-Hot-Vektor der Klasse. Die Klassen
-/// überlappen sich leicht, deshalb schafft kein Netz 100 %.
+/// ±1,5 (jede Wolke füllt ein Quadrat der Seitenlänge 3). Die Reihenfolge ist gemischt, das Ziel
+/// ist der One-Hot-Vektor der Klasse.
+///
+/// Die Klassen lassen sich trennen: Die Quadrate von Klasse 2 und den beiden anderen berühren sich
+/// nur bei y = 0,5, zwischen Klasse 0 und 1 bleibt eine Lücke von 1. Sie liegen aber stellenweise
+/// dicht beieinander, ein Netz mit wenigen Lernpunkten macht an den Grenzen deshalb noch einzelne
+/// Fehler.
 ///
 /// ```
 /// use neuronws_layers::datasets::blobs;

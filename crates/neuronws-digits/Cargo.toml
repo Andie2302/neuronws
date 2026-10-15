@@ -22,3 +22,7 @@ required-features = ["libm"]
 [[example]]
 name = "input_scale"
 required-features = ["libm"]
+
+[[example]]
+name = "adam_vs_sgd"
+required-features = ["libm"]

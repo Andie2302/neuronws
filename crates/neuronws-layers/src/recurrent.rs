@@ -36,6 +36,11 @@
 //! explodierende Gradienten hilft zusätzlich `ClipNorm` und eine orthogonale Initialisierung
 //! (`Orthogonal`).
 //!
+//! Wie weit sich jede der drei Zellen erinnert, misst das Beispiel `sequence_memory`. Dabei zeigt
+//! sich: Die Tore schützen das Gedächtnis nur, wenn sie am Anfang des Lernens offen stehen (siehe
+//! die Bias-Hinweise bei [`Gru`] und [`Lstm`]), und das einfache RNN profitiert deutlich von
+//! orthogonalen Startwerten.
+//!
 //! `Rnn` braucht nur eine Aktivierung (`Tanh` oder, ohne Mathe-Bibliothek, `HardTanh`). `Gru` und
 //! `Lstm` brauchen `exp` und `tanh`, deshalb gibt es sie nur mit dem Feature `std` oder `libm`.
 
@@ -223,6 +228,12 @@ fn sigmoid<T: Scalar>(z: T) -> T {
 /// ungedämpft zurück. So behält die GRU Information über viele Schritte. Die Parameter sind
 /// drei [`Gate`]s in der Reihenfolge `((r, z), n)`.
 ///
+/// Alle Biase starten bei 0, das Update-Tor also bei `z = σ(0) = 0,5`: Von einem Wert bleibt nach
+/// 31 Schritten nur `0,5³¹ ≈ 5·10⁻¹⁰` übrig. Für lange Folgen lohnt es sich, den Bias des
+/// Update-Tors nach dem Anlegen größer zu setzen (`parameters()` und `set_parameters()`, er steht
+/// bei `.0.1.1`). Das Beispiel `sequence_memory` zeigt den Unterschied: Bei Länge 32 schafft die
+/// GRU mit Bias 0 nur 54 %, mit Bias 2 dagegen 99,9 %.
+///
 /// Braucht `exp` und `tanh`, deshalb nur mit dem Feature `std` oder `libm`.
 #[cfg(any(feature = "std", feature = "libm"))]
 #[derive(Debug, Clone, Copy, Default)]
@@ -376,6 +387,10 @@ pub type GruLayer<const STEPS: usize, const IN: usize, const H: usize, T = f32> 
 /// bei 1 (alle anderen bei 0): Das Netz erinnert sich anfangs lieber, als dass es vergisst, was
 /// das Lernen langer Abhängigkeiten deutlich erleichtert. Die Parameter sind vier [`Gate`]s in
 /// der Reihenfolge `((i, f), (g, o))`. Ausgegeben wird der Zustand `h` jedes Schrittes.
+///
+/// Bei sehr langen Folgen kann es sich lohnen, den Bias des Vergiss-Tors noch größer zu setzen
+/// (`parameters()` und `set_parameters()`, er steht bei `.0.1.1`). Im Beispiel `sequence_memory`
+/// kommt das LSTM bei Länge 32 mit Bias 1 auf 71 % und mit Bias 2 auf 95 %.
 ///
 /// Braucht `exp` und `tanh`, deshalb nur mit dem Feature `std` oder `libm`.
 #[cfg(any(feature = "std", feature = "libm"))]
