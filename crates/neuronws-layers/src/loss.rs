@@ -66,3 +66,35 @@ impl<const N: usize> Loss<N> for BinaryCrossEntropy {
         })
     }
 }
+
+/// Kreuzentropie für mehrere Klassen: `L = −Σ t[i] ln(y[i])`.
+///
+/// Für Ausgaben `y` hinter einer `SoftmaxLayer` und ein Ziel `t` als "One-Hot"-Vektor
+/// (eine 1 bei der richtigen Klasse, sonst 0). Anders als beim Mittelwert über `N` Werte
+/// wird hier **summiert**: Pro Beispiel zählt nur die richtige Klasse.
+/// `y` wird knapp über 0 abgeschnitten, damit `ln(0)` nie auftritt.
+/// Braucht `ln`, deshalb nur mit dem Feature `std` oder `libm`.
+#[cfg(any(feature = "std", feature = "libm"))]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CategoricalCrossEntropy;
+
+#[cfg(any(feature = "std", feature = "libm"))]
+fn clamp_positive<T: Scalar>(y: T) -> T {
+    let epsilon = T::from_f32(1e-7);
+    if y < epsilon { epsilon } else { y }
+}
+
+#[cfg(any(feature = "std", feature = "libm"))]
+impl<const N: usize> Loss<N> for CategoricalCrossEntropy {
+    fn value<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> T {
+        output
+            .iter()
+            .zip(target)
+            .fold(T::ZERO, |sum, (&y, &t)| sum - t * clamp_positive(y).ln())
+    }
+
+    /// `∂L/∂y[i] = −t[i] / y[i]`
+    fn gradient<T: Scalar>(&self, output: &[T; N], target: &[T; N]) -> [T; N] {
+        core::array::from_fn(|i| -target[i] / clamp_positive(output[i]))
+    }
+}

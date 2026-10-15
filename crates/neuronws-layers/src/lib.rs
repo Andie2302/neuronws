@@ -7,4 +7,6 @@ pub mod loss;
 pub mod optimizer;
 pub mod random;
 pub mod scalar;
+#[cfg(any(feature = "std", feature = "libm"))]
+pub mod softmax_layer;
 pub mod traits;
