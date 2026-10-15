@@ -1,5 +1,5 @@
 use crate::traits::{
-    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
+    BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
 
 /// Hintereinanderschaltung zweier Schichten: die Ausgabe von `first` ist die Eingabe von `second`.
@@ -31,8 +31,6 @@ impl<A, B> Chain<A, B> {
 }
 
 impl<A: Layer, B: Layer> Layer for Chain<A, B> {}
-
-impl<A: Data, B: Data> Data for Chain<A, B> {}
 
 impl<A, B> ForwardData for Chain<A, B>
 where

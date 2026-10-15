@@ -1,12 +1,10 @@
 pub trait Layer {}
 
-pub trait Data {}
-
-pub trait ForwardData: Data {
+pub trait ForwardData {
     type ForwardInput;
     type ForwardOutput;
 }
-pub trait BackwardData: Data {
+pub trait BackwardData {
     type BackwardInput;
     type BackwardOutput;
 }

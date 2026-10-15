@@ -1,6 +1,6 @@
 use crate::activation::Activation;
 use crate::traits::{
-    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
+    BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
 
 /// Wendet eine Aktivierungsfunktion elementweise auf `N` Werte an.
@@ -24,8 +24,6 @@ impl<const N: usize, A: Activation> ActivationLayer<N, A> {
 }
 
 impl<const N: usize, A: Activation> Layer for ActivationLayer<N, A> {}
-
-impl<const N: usize, A: Activation> Data for ActivationLayer<N, A> {}
 
 impl<const N: usize, A: Activation> ForwardData for ActivationLayer<N, A> {
     type ForwardInput = [f32; N];

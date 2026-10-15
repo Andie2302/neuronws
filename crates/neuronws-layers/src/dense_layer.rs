@@ -1,6 +1,6 @@
 use crate::random::Rng;
 use crate::traits::{
-    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
+    BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
 
 pub struct DenseLayer<const IN: usize, const OUT: usize> {
@@ -63,8 +63,6 @@ impl<const IN: usize, const OUT: usize> DenseLayer<IN, OUT> {
 }
 
 impl<const IN: usize, const OUT: usize> Layer for DenseLayer<IN, OUT> {}
-
-impl<const IN: usize, const OUT: usize> Data for DenseLayer<IN, OUT> {}
 
 impl<const IN: usize, const OUT: usize> ForwardData for DenseLayer<IN, OUT> {
     type ForwardInput = [f32; IN];
