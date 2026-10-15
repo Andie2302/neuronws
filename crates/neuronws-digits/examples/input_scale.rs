@@ -1,15 +1,15 @@
-//! Was passiert, wenn die Eingaben nicht 0 und 1 sind, sondern 0 und 100?
+//! Wie wichtig ist die Größe der Eingaben? Dasselbe Netz, dieselben Bilder, dieselben Startwerte,
+//! nur die Pixel werden vor dem Netz mit einem Faktor multipliziert.
 //!
-//! Dasselbe Netz, dieselben Daten, dieselben Startwerte, nur die Pixel werden vor dem Netz
-//! mit einem Faktor multipliziert. Vor jeder Tanh-Aktivierung sitzt ein Messfühler, der aufschreibt,
-//! wie groß die eingehenden Werte `z` sind und wie groß die Ableitung dort ist.
+//! Vor jeder Aktivierung sitzt ein Messfühler. Er schreibt auf, wie groß die eingehenden Werte `z`
+//! sind und bei wie vielen die Ableitung kleiner als 0,05 ist, also kaum noch ein Lernsignal ankommt.
 //!
 //! Start: `cargo run --release -p neuronws-digits --example input_scale`
 
 use std::cell::Cell;
 
 use neuronws_digits::{CLASSES, HIDDEN, PIXELS, Sample, accuracy, noisy_dataset};
-use neuronws_layers::activation::{Activation, Tanh};
+use neuronws_layers::activation::{Activation, Relu, Tanh};
 use neuronws_layers::activation_layer::ActivationLayer;
 use neuronws_layers::chain::LayerExt;
 use neuronws_layers::dense_layer::DenseLayer;
@@ -26,50 +26,44 @@ use neuronws_layers::traits::ForwardPath;
 struct Stats {
     count: Cell<usize>,
     sum_abs_z: Cell<f64>,
-    saturated: Cell<usize>,
-    sum_derivative: Cell<f64>,
+    no_signal: Cell<usize>,
 }
 
 impl Stats {
     fn reset(&self) {
         self.count.set(0);
         self.sum_abs_z.set(0.0);
-        self.saturated.set(0);
-        self.sum_derivative.set(0.0);
+        self.no_signal.set(0);
     }
 
-    fn report(&self) -> String {
-        let n = self.count.get() as f64;
-        format!(
-            "mittleres |z| = {:7.2}, gesättigt (|z| > 3): {:5.1} %, mittlere Ableitung: {:.4}",
-            self.sum_abs_z.get() / n,
-            100.0 * self.saturated.get() as f64 / n,
-            self.sum_derivative.get() / n,
-        )
+    fn mean_abs_z(&self) -> f64 {
+        self.sum_abs_z.get() / self.count.get() as f64
+    }
+
+    fn percent_without_signal(&self) -> f64 {
+        100.0 * self.no_signal.get() as f64 / self.count.get() as f64
     }
 }
 
-/// Eine Tanh-Aktivierung, die nebenbei aufschreibt, was in sie hineingeht.
+/// Eine Aktivierung, die nebenbei aufschreibt, was in sie hineingeht.
 #[derive(Debug)]
-struct MeasuringTanh<'a>(&'a Stats);
+struct Measuring<'a, A>(&'a Stats, A);
 
-impl Activation for MeasuringTanh<'_> {
+impl<A: Activation> Activation for Measuring<'_, A> {
     fn apply<T: Scalar>(&self, z: T) -> T {
         let stats = self.0;
-        let z64 = z.to_f64();
         stats.count.set(stats.count.get() + 1);
-        stats.sum_abs_z.set(stats.sum_abs_z.get() + z64.abs());
         stats
-            .sum_derivative
-            .set(stats.sum_derivative.get() + (1.0 - z64.tanh().powi(2)));
-        if z64.abs() > 3.0 {
-            stats.saturated.set(stats.saturated.get() + 1);
+            .sum_abs_z
+            .set(stats.sum_abs_z.get() + z.to_f64().abs());
+        if self.1.derivative(z).to_f64() < 0.05 {
+            stats.no_signal.set(stats.no_signal.get() + 1);
         }
-        Tanh.apply(z)
+        self.1.apply(z)
     }
 
     fn derivative<T: Scalar>(&self, z: T) -> T {
-        Tanh.derivative(z)
+        self.1.derivative(z)
     }
 }
 
@@ -79,15 +73,24 @@ fn scaled(data: &[Sample], factor: f32) -> Vec<Sample> {
         .collect()
 }
 
-fn experiment(title: &str, factor: f32, learning_rate: f32) {
-    println!("\n=== {title}: Pixel 0 und {factor}, Lernrate {learning_rate} ===");
+struct Outcome {
+    mean_abs_z_start: f64,
+    no_signal_start: f64,
+    accuracy_after: f32,
+    loss_after: f32,
+    mean_abs_z_end: f64,
+}
+
+fn experiment<A: Activation>(activation: A, factor: f32, learning_rate: f32) -> Outcome {
     let mut rng = Rng::new(2026);
     let mut training = scaled(&noisy_dataset::<300>(2, &mut rng), factor);
     let test = scaled(&noisy_dataset::<200>(2, &mut rng), factor);
 
     let stats = Stats::default();
     let mut net = DenseLayer::<PIXELS, HIDDEN>::xavier(&mut rng)
-        .then(ActivationLayer::<HIDDEN, _>::new(MeasuringTanh(&stats)))
+        .then(ActivationLayer::<HIDDEN, _>::new(Measuring(
+            &stats, activation,
+        )))
         .then(DenseLayer::<HIDDEN, CLASSES>::xavier(&mut rng))
         .then(SoftmaxLayer::<CLASSES>::new());
     let mut sgd = Sgd::new(learning_rate);
@@ -97,30 +100,83 @@ fn experiment(title: &str, factor: f32, learning_rate: f32) {
         for (image, _) in &test {
             let _: [f32; CLASSES] = ForwardPath::forward(net, image);
         }
-        stats.report()
     };
 
-    println!("vor dem Lernen:   {}", measure(&net));
-    println!(
-        "                  Test {:5.1} % richtig",
-        100.0 * accuracy(&net, &test)
-    );
-    for epoch in 1..=60 {
+    measure(&net);
+    let (mean_abs_z_start, no_signal_start) = (stats.mean_abs_z(), stats.percent_without_signal());
+
+    let mut loss_after = 0.0;
+    for _ in 0..60 {
         rng.shuffle(&mut training);
-        let loss = train_epoch(&mut net, &mut sgd, &CategoricalCrossEntropy, &training, 10);
-        if [1, 5, 20, 60].contains(&epoch) {
-            println!(
-                "Epoche {epoch:2}: Verlust {loss:8.4}, Test {:5.1} % richtig",
-                100.0 * accuracy(&net, &test)
-            );
-        }
+        loss_after = train_epoch(&mut net, &mut sgd, &CategoricalCrossEntropy, &training, 10);
     }
-    println!("nach dem Lernen:  {}", measure(&net));
+
+    measure(&net);
+    Outcome {
+        mean_abs_z_start,
+        no_signal_start,
+        accuracy_after: accuracy(&net, &test),
+        loss_after,
+        mean_abs_z_end: stats.mean_abs_z(),
+    }
+}
+
+fn print_header(title: &str) {
+    println!("\n{title}");
+    println!(
+        "  Aktivierung  Faktor  Lernrate | Start: mittl. |z|  ohne Signal | nach 60 Epochen: Treffer  Verlust  mittl. |z|"
+    );
+}
+
+fn print_row(name: &str, factor: f32, learning_rate: f32, r: &Outcome) {
+    println!(
+        "  {name:<11} {factor:>7} {learning_rate:>9} | {:>16.2} {:>10.1} % | {:>22.1} % {:>8.3} {:>9.2}",
+        r.mean_abs_z_start,
+        r.no_signal_start,
+        100.0 * r.accuracy_after,
+        r.loss_after,
+        r.mean_abs_z_end,
+    );
 }
 
 fn main() {
-    experiment("Normal", 1.0, 0.1);
-    experiment("Große Eingaben", 100.0, 0.1);
-    experiment("Große Eingaben, viel kleinere Lernrate", 100.0, 0.001);
-    experiment("Große Eingaben, noch kleinere Lernrate", 100.0, 0.00001);
+    print_header("1. Dieselbe Lernrate (0,1), drei Größen der Eingaben, zwei Aktivierungen");
+    for factor in [1.0, 100.0, 0.01] {
+        print_row("Tanh", factor, 0.1, &experiment(Tanh, factor, 0.1));
+        print_row("ReLU", factor, 0.1, &experiment(Relu, factor, 0.1));
+    }
+
+    print_header(
+        "2. Sehr kleine Eingaben (0 und 0,01): lässt sich das mit der Lernrate ausgleichen?",
+    );
+    for learning_rate in [0.1, 1.0, 10.0, 100.0, 1000.0] {
+        print_row(
+            "Tanh",
+            0.01,
+            learning_rate,
+            &experiment(Tanh, 0.01, learning_rate),
+        );
+        print_row(
+            "ReLU",
+            0.01,
+            learning_rate,
+            &experiment(Relu, 0.01, learning_rate),
+        );
+    }
+
+    print_header("3. Große Eingaben (0 und 100): lässt sich das mit der Lernrate ausgleichen?");
+    for learning_rate in [0.1, 0.001, 0.00001, 0.0000001] {
+        print_row(
+            "Tanh",
+            100.0,
+            learning_rate,
+            &experiment(Tanh, 100.0, learning_rate),
+        );
+        print_row(
+            "ReLU",
+            100.0,
+            learning_rate,
+            &experiment(Relu, 100.0, learning_rate),
+        );
+    }
 }
