@@ -1,27 +1,9 @@
 use neuronws_layers::activation::Relu;
 use neuronws_layers::activation_layer::ActivationLayer;
 use neuronws_layers::chain::LayerExt;
+use neuronws_layers::datasets::logic::{AND, OR, XOR};
 use neuronws_layers::traits::ForwardPath;
 use neuronws_perceptrons::Perceptron;
-
-const AND: [([f32; 2], f32); 4] = [
-    ([0.0, 0.0], 0.0),
-    ([0.0, 1.0], 0.0),
-    ([1.0, 0.0], 0.0),
-    ([1.0, 1.0], 1.0),
-];
-const OR: [([f32; 2], f32); 4] = [
-    ([0.0, 0.0], 0.0),
-    ([0.0, 1.0], 1.0),
-    ([1.0, 0.0], 1.0),
-    ([1.0, 1.0], 1.0),
-];
-const XOR: [([f32; 2], f32); 4] = [
-    ([0.0, 0.0], 0.0),
-    ([0.0, 1.0], 1.0),
-    ([1.0, 0.0], 1.0),
-    ([1.0, 1.0], 0.0),
-];
 
 fn assert_classifies(perceptron: &Perceptron<2>, data: &[([f32; 2], f32)]) {
     for (input, target) in data {

@@ -10,42 +10,22 @@ use neuronws_layers::activation::{Relu, Tanh};
 use neuronws_layers::activation_layer::Elementwise;
 use neuronws_layers::adam::AdamW;
 use neuronws_layers::chain::LayerExt;
+use neuronws_layers::datasets::blobs;
 use neuronws_layers::dense_layer::Linear;
 use neuronws_layers::init::{He, Xavier};
 use neuronws_layers::loss::CategoricalCrossEntropy;
+use neuronws_layers::metrics::accuracy;
 use neuronws_layers::neurons::neurons;
 use neuronws_layers::optimizer::HasLearningRate;
 use neuronws_layers::random::Rng;
 use neuronws_layers::schedule::{Schedule, StepDecay};
 use neuronws_layers::softmax_layer::Softmax;
 use neuronws_layers::trainer::Trainer;
-use neuronws_layers::traits::ForwardPath;
-
-const CENTERS: [[f32; 2]; 3] = [[-2.0, -1.0], [2.0, -1.0], [0.0, 2.0]];
-
-/// `per_class` Punkte um jedes Zentrum, Ziel ist der One-Hot-Vektor der Klasse.
-fn make_data(rng: &mut Rng, per_class: usize) -> Vec<([f32; 2], [f32; 3])> {
-    let mut data = Vec::new();
-    for (class, [cx, cy]) in CENTERS.iter().enumerate() {
-        for _ in 0..per_class {
-            let point = [cx + rng.uniform(-1.5, 1.5), cy + rng.uniform(-1.5, 1.5)];
-            let mut target = [0.0; 3];
-            target[class] = 1.0;
-            data.push((point, target));
-        }
-    }
-    rng.shuffle(&mut data);
-    data
-}
-
-fn argmax(values: &[f32; 3]) -> usize {
-    (1..3).fold(0, |best, i| if values[i] > values[best] { i } else { best })
-}
 
 fn main() {
     let mut rng = Rng::new(42);
-    let train = make_data(&mut rng, 40);
-    let test = make_data(&mut rng, 100);
+    let train = blobs::<120>(&mut rng);
+    let test = blobs::<300>(&mut rng);
 
     // Drei Schichten mit Neuronen, jede mit eigener Rechnung, eigenen Startwerten und eigener
     // Aktivierung. Die letzte nimmt Softmax, damit die Ausgaben Wahrscheinlichkeiten sind.
@@ -86,13 +66,10 @@ fn main() {
         }
     }
 
-    let correct = test
-        .iter()
-        .filter(|(x, target)| argmax(&net.forward(x)) == argmax(target))
-        .count();
+    let hits: f32 = accuracy(&net, &test);
     println!(
-        "\nRichtig erkannt auf neuen Daten: {correct} von {} ({:.1} %)",
-        test.len(),
-        100.0 * correct as f32 / test.len() as f32
+        "\nRichtig erkannt auf neuen Daten: {:.1} % ({} Beispiele)",
+        100.0 * hits,
+        test.len()
     );
 }

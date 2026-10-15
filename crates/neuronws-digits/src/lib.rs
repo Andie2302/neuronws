@@ -9,6 +9,7 @@
 
 #![no_std]
 
+use neuronws_layers::metrics;
 use neuronws_layers::random::Rng;
 use neuronws_layers::traits::ForwardPath;
 
@@ -96,10 +97,10 @@ pub fn one_hot(digit: usize) -> Label {
 }
 
 /// Die Stelle mit dem größten Wert, also die erkannte Ziffer.
+///
+/// Bei Gleichstand gilt die erste Stelle, siehe [`neuronws_layers::metrics::argmax`].
 pub fn argmax(output: &Label) -> usize {
-    (0..CLASSES)
-        .max_by(|&a, &b| output[a].total_cmp(&output[b]))
-        .unwrap_or(0)
+    metrics::argmax(output)
 }
 
 /// Kippt genau `count` verschiedene, zufällig gewählte Pixel (schwarz wird weiß und umgekehrt).
@@ -136,13 +137,11 @@ pub fn noisy_dataset<const N: usize>(max_flips: usize, rng: &mut Rng) -> [Sample
 }
 
 /// Anteil der Beispiele, bei denen die größte Ausgabe an der richtigen Stelle steht.
+///
+/// Das ist [`neuronws_layers::metrics::accuracy`] für die Typen dieser Crate.
 pub fn accuracy<M>(model: &M, data: &[Sample]) -> f32
 where
     M: ForwardPath<ForwardInput = Image, ForwardOutput = Label>,
 {
-    let correct = data
-        .iter()
-        .filter(|(image, label)| argmax(&model.forward(image)) == argmax(label))
-        .count();
-    correct as f32 / data.len() as f32
+    metrics::accuracy(model, data)
 }

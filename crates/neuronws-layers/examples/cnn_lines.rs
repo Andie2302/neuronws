@@ -18,9 +18,11 @@ use neuronws_layers::adam::AdamW;
 use neuronws_layers::block::Block;
 use neuronws_layers::chain::LayerExt;
 use neuronws_layers::conv::Conv2dValid;
+use neuronws_layers::datasets::{LINE_CLASSES, lines};
 use neuronws_layers::dense_layer::Linear;
 use neuronws_layers::init::{He, Xavier};
 use neuronws_layers::loss::CategoricalCrossEntropy;
+use neuronws_layers::metrics::{accuracy, argmax};
 use neuronws_layers::neurons::neurons;
 use neuronws_layers::pooling::MaxPool2d;
 use neuronws_layers::random::Rng;
@@ -30,49 +32,15 @@ use neuronws_layers::trainer::Trainer;
 use neuronws_layers::traits::{ForwardPath, Trainable};
 use neuronws_layers::values::Image;
 
-const CLASSES: [&str; 3] = ["senkrecht", "waagrecht", "diagonal"];
-
-type Sample = (Image<1, 6, 6>, [f32; 3]);
-
-/// Ein Bild der Klasse `class` mit der Linie an zufälliger Stelle und Rauschen.
-fn make_image(rng: &mut Rng, class: usize) -> Sample {
-    let mut image = [[[0.0_f32; 6]; 6]];
-    let at = rng.next_below(6);
-    for i in 0..6 {
-        match class {
-            0 => image[0][i][at] = 1.0,
-            1 => image[0][at][i] = 1.0,
-            _ if at.is_multiple_of(2) => image[0][i][i] = 1.0,
-            _ => image[0][i][5 - i] = 1.0,
-        }
-    }
-    for value in image[0].iter_mut().flatten() {
-        *value += rng.uniform(-0.2, 0.2);
-    }
-    let mut target = [0.0; 3];
-    target[class] = 1.0;
-    (image, target)
-}
-
-fn make_data(rng: &mut Rng, per_class: usize) -> Vec<Sample> {
-    let mut data: Vec<Sample> = (0..per_class * 3).map(|i| make_image(rng, i % 3)).collect();
-    rng.shuffle(&mut data);
-    data
-}
-
 /// Anzahl der lernbaren Parameter eines beliebigen Netzes, ohne den Typ hinzuschreiben.
 fn parameter_count<M: Trainable>(_model: &M) -> usize {
     M::PARAMETER_COUNT
 }
 
-fn argmax(values: &[f32; 3]) -> usize {
-    (1..3).fold(0, |best, i| if values[i] > values[best] { i } else { best })
-}
-
 fn main() {
     let mut rng = Rng::new(7);
-    let train = make_data(&mut rng, 40);
-    let test = make_data(&mut rng, 100);
+    let train = lines::<120>(&mut rng);
+    let test = lines::<300>(&mut rng);
 
     // Faltung und ReLU in einem Aufruf: `neurons` kennt keine Formen und geht deshalb auch für Bilder.
     let mut net = neurons(
@@ -109,19 +77,16 @@ fn main() {
         let loss = trainer.epoch(&mut net, &train);
         if epoch % 5 == 0 || epoch == 39 {
             let test_loss = trainer.evaluate(&net, &test);
-            let hits = test
-                .iter()
-                .filter(|(x, t)| argmax(&net.forward(x)) == argmax(t))
-                .count();
+            let hits = accuracy::<f32, _, _, _>(&net, &test);
             println!(
-                "{epoch:5}   {loss:18.4}   {test_loss:14.4}   {hits:3} von {}",
-                test.len()
+                "{epoch:5}   {loss:18.4}   {test_loss:14.4}   {:5.1} %",
+                100.0 * hits
             );
         }
     }
 
     println!("\nPro Klasse (neue Bilder):");
-    for (class, name) in CLASSES.iter().enumerate() {
+    for (class, name) in LINE_CLASSES.iter().enumerate() {
         let of_class: Vec<_> = test.iter().filter(|(_, t)| argmax(t) == class).collect();
         let hits = of_class
             .iter()

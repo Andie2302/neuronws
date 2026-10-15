@@ -16,13 +16,17 @@ pub mod chain;
 pub mod conv;
 pub mod conv1d;
 pub mod conv_transpose;
+pub mod data;
+pub mod datasets;
 pub mod dense_layer;
 pub mod diagonal;
 pub mod dropout;
 pub mod each;
+pub mod early_stopping;
 pub mod gradcheck;
 pub mod init;
 pub mod loss;
+pub mod metrics;
 pub mod neurons;
 #[cfg(any(feature = "std", feature = "libm"))]
 pub mod norm;
