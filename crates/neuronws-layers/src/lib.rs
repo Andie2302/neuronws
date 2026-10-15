@@ -9,5 +9,6 @@ pub mod random;
 pub mod scalar;
 #[cfg(any(feature = "std", feature = "libm"))]
 pub mod softmax_layer;
+pub mod standardize;
 pub mod training;
 pub mod traits;

@@ -8,7 +8,7 @@
 
 use std::cell::Cell;
 
-use neuronws_digits::{CLASSES, HIDDEN, PIXELS, Sample, accuracy, noisy_dataset};
+use neuronws_digits::{CLASSES, HIDDEN, Image, Label, PIXELS, Sample, accuracy, noisy_dataset};
 use neuronws_layers::activation::{Activation, Relu, Tanh};
 use neuronws_layers::activation_layer::ActivationLayer;
 use neuronws_layers::chain::LayerExt;
@@ -18,8 +18,9 @@ use neuronws_layers::optimizer::Sgd;
 use neuronws_layers::random::Rng;
 use neuronws_layers::scalar::Scalar;
 use neuronws_layers::softmax_layer::SoftmaxLayer;
+use neuronws_layers::standardize::Standardize;
 use neuronws_layers::training::train_epoch;
-use neuronws_layers::traits::ForwardPath;
+use neuronws_layers::traits::{BackwardPathMut, ForwardPath, ForwardPathMut, Trainable};
 
 /// Die Messwerte: alle `z`, die in die Aktivierung hineingegangen sind.
 #[derive(Debug, Default)]
@@ -81,24 +82,26 @@ struct Outcome {
     mean_abs_z_end: f64,
 }
 
-fn experiment<A: Activation>(activation: A, factor: f32, learning_rate: f32) -> Outcome {
-    let mut rng = Rng::new(2026);
-    let mut training = scaled(&noisy_dataset::<300>(2, &mut rng), factor);
-    let test = scaled(&noisy_dataset::<200>(2, &mut rng), factor);
-
-    let stats = Stats::default();
-    let mut net = DenseLayer::<PIXELS, HIDDEN>::xavier(&mut rng)
-        .then(ActivationLayer::<HIDDEN, _>::new(Measuring(
-            &stats, activation,
-        )))
-        .then(DenseLayer::<HIDDEN, CLASSES>::xavier(&mut rng))
-        .then(SoftmaxLayer::<CLASSES>::new());
+/// Lernt 60 Epochen und misst vorher und nachher. Gilt für jedes Netz mit dieser Ein- und Ausgabe.
+fn evaluate<M>(
+    mut net: M,
+    stats: &Stats,
+    rng: &mut Rng,
+    mut training: Vec<Sample>,
+    test: &[Sample],
+    learning_rate: f32,
+) -> Outcome
+where
+    M: ForwardPath<ForwardInput = Image, ForwardOutput = Label>
+        + ForwardPathMut<ForwardInput = Image, ForwardOutput = Label>
+        + BackwardPathMut<BackwardInput = Label, BackwardOutput = Image>
+        + Trainable<Scalar = f32>,
+{
     let mut sgd = Sgd::new(learning_rate);
-
-    let measure = |net: &_| {
+    let measure = |net: &M| {
         stats.reset();
-        for (image, _) in &test {
-            let _: [f32; CLASSES] = ForwardPath::forward(net, image);
+        for (image, _) in test {
+            let _: Label = ForwardPath::forward(net, image);
         }
     };
 
@@ -115,10 +118,49 @@ fn experiment<A: Activation>(activation: A, factor: f32, learning_rate: f32) -> 
     Outcome {
         mean_abs_z_start,
         no_signal_start,
-        accuracy_after: accuracy(&net, &test),
+        accuracy_after: accuracy(&net, test),
         loss_after,
         mean_abs_z_end: stats.mean_abs_z(),
     }
+}
+
+fn data(factor: f32) -> (Rng, Vec<Sample>, Vec<Sample>) {
+    let mut rng = Rng::new(2026);
+    let training = scaled(&noisy_dataset::<300>(2, &mut rng), factor);
+    let test = scaled(&noisy_dataset::<200>(2, &mut rng), factor);
+    (rng, training, test)
+}
+
+/// Das Netz direkt auf den (skalierten) Pixeln.
+fn experiment<A: Activation>(activation: A, factor: f32, learning_rate: f32) -> Outcome {
+    let (mut rng, training, test) = data(factor);
+    let stats = Stats::default();
+    let net = DenseLayer::<PIXELS, HIDDEN>::xavier(&mut rng)
+        .then(ActivationLayer::<HIDDEN, _>::new(Measuring(
+            &stats, activation,
+        )))
+        .then(DenseLayer::<HIDDEN, CLASSES>::xavier(&mut rng))
+        .then(SoftmaxLayer::<CLASSES>::new());
+    evaluate(net, &stats, &mut rng, training, &test, learning_rate)
+}
+
+/// Dasselbe Netz, aber mit einer `Standardize`-Schicht davor, die aus den Lerndaten berechnet wird.
+fn experiment_standardized<A: Activation>(
+    activation: A,
+    factor: f32,
+    learning_rate: f32,
+) -> Outcome {
+    let (mut rng, training, test) = data(factor);
+    let stats = Stats::default();
+    let standardize = Standardize::fit(training.iter().map(|(image, _)| image));
+    let net = standardize
+        .then(DenseLayer::<PIXELS, HIDDEN>::xavier(&mut rng))
+        .then(ActivationLayer::<HIDDEN, _>::new(Measuring(
+            &stats, activation,
+        )))
+        .then(DenseLayer::<HIDDEN, CLASSES>::xavier(&mut rng))
+        .then(SoftmaxLayer::<CLASSES>::new());
+    evaluate(net, &stats, &mut rng, training, &test, learning_rate)
 }
 
 fn print_header(title: &str) {
@@ -177,6 +219,24 @@ fn main() {
             100.0,
             learning_rate,
             &experiment(Relu, 100.0, learning_rate),
+        );
+    }
+
+    print_header(
+        "4. Mit Standardize vor dem Netz (aus den Lerndaten berechnet), Lernrate 0,1: die Größe der Eingaben spielt keine Rolle mehr",
+    );
+    for factor in [1.0, 100.0, 0.01] {
+        print_row(
+            "Tanh",
+            factor,
+            0.1,
+            &experiment_standardized(Tanh, factor, 0.1),
+        );
+        print_row(
+            "ReLU",
+            factor,
+            0.1,
+            &experiment_standardized(Relu, factor, 0.1),
         );
     }
 }

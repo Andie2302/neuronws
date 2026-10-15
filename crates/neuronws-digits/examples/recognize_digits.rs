@@ -12,6 +12,10 @@ use neuronws_layers::random::Rng;
 use neuronws_layers::training::train_epoch;
 use neuronws_layers::traits::ForwardPath;
 
+fn pixel_distance(a: &Image, b: &Image) -> usize {
+    a.iter().zip(b).filter(|(x, y)| x != y).count()
+}
+
 fn print_image(image: &Image) {
     for row in 0..HEIGHT {
         let line: String = (0..WIDTH)
@@ -74,6 +78,40 @@ fn main() {
         println!(
             "  {flips} falsche Pixel: {:.1} % richtig",
             100.0 * accuracy(&net, &noisy)
+        );
+    }
+
+    println!("\nWelche Ziffern fallen schwer? (je 1000 Bilder pro Ziffer, 4 falsche Pixel)");
+    println!("  Ziffer | richtig | häufigster Fehler | nächste andere Ziffer (Pixel Unterschied)");
+    for (digit, clean) in DIGITS.iter().enumerate() {
+        let mut right = 0;
+        let mut mistakes = [0_usize; CLASSES];
+        for _ in 0..1000 {
+            let guess = argmax(&net.forward(&flip_pixels(clean, 4, &mut rng)));
+            if guess == digit {
+                right += 1;
+            } else {
+                mistakes[guess] += 1;
+            }
+        }
+        let (worst, count) = mistakes
+            .iter()
+            .enumerate()
+            .max_by_key(|&(_, n)| *n)
+            .unwrap();
+        let (nearest, distance) = (0..CLASSES)
+            .filter(|&other| other != digit)
+            .map(|other| (other, pixel_distance(clean, &DIGITS[other])))
+            .min_by_key(|&(_, d)| d)
+            .unwrap();
+        let mistake = if *count > 0 {
+            format!("{worst} ({count}x)")
+        } else {
+            "-".to_string()
+        };
+        println!(
+            "  {digit:6} | {:5.1} % | {mistake:>17} | {nearest} ({distance})",
+            right as f32 / 10.0
         );
     }
 
