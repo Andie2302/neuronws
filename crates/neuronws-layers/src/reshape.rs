@@ -12,7 +12,8 @@ use crate::values::Values;
 /// folgen kann, oder einen Vektor wieder zu einem Bild falten. Die Zahlen behalten ihre
 /// Reihenfolge (siehe [`Values`]). Hat keine Parameter.
 ///
-/// Beide Formen müssen gleich viele Zahlen haben. Das prüft der Compiler:
+/// Beide Formen müssen gleich viele Zahlen haben. Das prüft der Compiler, allerdings erst beim
+/// Bauen (`cargo build`, `cargo test`), nicht bei `cargo check`:
 ///
 /// ```compile_fail
 /// use neuronws_layers::reshape::Reshape;

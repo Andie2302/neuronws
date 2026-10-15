@@ -47,12 +47,17 @@ Die drei echten Engstellen:
 - [ ] `Softmax` und `Standardize` kennen nur Vektoren. Für Bilder auf eine Achse (z. B. Softmax über die Kanäle) verallgemeinern.
 - [ ] `Linear` (Dense) nimmt nur Vektoren. Mit `Reshape` davor und danach ist das kein Hindernis, eine Variante für Matrizen wäre aber bequemer.
 - [ ] **Feste Größen:** Später eventuell eine dynamische Variante hinter dem Feature `alloc`.
+- [ ] **Faltung erweitern:** Schrittweite (stride), Rand auffüllen (padding, „same"), Dilation, 1D-Faltung für Folgen, Transponierte Faltung (zum Hochskalieren).
+- [ ] **Die Faltung hat 8 Konstanten** (`Conv2d<C_IN, C_OUT, H, W, KH, KW, OH, OW>`), weil Rust `H − KH + 1` im Typ noch nicht ausrechnen kann (`generic_const_exprs` ist instabil). Prüfen, ob ein Makro, ein Typ-Bündel (z. B. ein Trait `Geometry`) oder später die stabile Sprachfunktion das lesbarer macht.
+- [ ] **Fehler in Größenprüfungen erscheinen erst beim Bauen:** Falsche Größen bei `Conv2d`, Pooling und `Reshape` meldet `cargo build`/`cargo test`, aber nicht `cargo check` und wohl auch nicht RustRover beim Tippen. Prüfen, ob es eine bessere Lösung gibt, und es in der README erklären.
+- [ ] Bequeme Helfer wie `neurons(...)`, aber für Bilder (Faltung + Aktivierung in einem Aufruf).
 - [ ] Kombinatoren für Verzweigungen: `Residual`, `Fork` (Gradienten der Zweige addieren).
 - [ ] Weg für Zufall in `forward` (Dropout, VAE).
 
 Empfohlene Reihenfolge, falls wir eine andere Netzart bauen wollen:
 
-- [ ] ! Als Nächstes ein **CNN** (Unterbau steht: Formen sind verallgemeinert; fehlen noch Faltungs- und Pooling-Operation) (zeigt schnell, ob der Entwurf hält), danach ein **RNN** (zeigt, ob „Folge als eine Operation" trägt).
+- [x] **CNN**: `Conv2d`, `MaxPool2d`, `AvgPool2d` stehen, Beispiel `cnn_lines` erkennt Linien mit 91 Parametern. Der Entwurf hält.
+- [ ] ! Als Nächstes ein **RNN** (zeigt, ob „Folge als eine Operation" trägt).
 
 ## Bausteine zum Austauschen
 
@@ -81,7 +86,8 @@ Lernraten-Pläne:
 ## Praxis
 
 - [ ] **Gewichte speichern und laden**, ohne `std` und `alloc` (z. B. als Rust-Konstanten ausgeben oder in ein Byte-Array schreiben)
-- [ ] **Große Netze**: `Block` und der Optimierer kopieren ganze Arrays (`Values: Copy`). Prüfen, ab welcher Größe der Stack Probleme macht, und ob wir auf Referenzen/Slices umstellen müssen.
+- [ ] ! **Große Netze und Stack:** Jeder `Block` hält Eingabe, Ausgabe und Eingabe-Gradient als Arrays, dazu Parameter und Gradienten. Der Optimierer legt `m` und `v` (Adam) zusätzlich an. Bei Bildern wird das schnell groß: eine Faltung mit 16 Kanälen auf 28×28 hat schon über 12 000 Werte pro Array, und jedes Array liegt mehrfach auf dem Stack. Messen, ab welcher Größe der Stack (Standard 2 MB im Test-Thread) überläuft, und eine Lösung finden (z. B. `Box` hinter `alloc`, Statics oder Slices).
+- [ ] **Geschwindigkeit der Faltung:** Naive Schleifen, keine Matrix-Tricks (im2col). Für kleine Bilder egal, für größere messen (Benchmarks, siehe unten).
 - [ ] Beispiel **Ziffernerkennung** mit Adam und Softmax neu aufsetzen und mit dem alten Ergebnis vergleichen
 - [ ] Beispiel auf einem echten Mikrocontroller (`no_std`) ausprobieren
 - [ ] Benchmarks: SGD gegen Momentum gegen Adam auf mehreren Aufgaben
@@ -96,6 +102,7 @@ Lernraten-Pläne:
 
 - [ ] `Trainable::PARAMETER_COUNT` und `Shape::LEN` sind jetzt doppelt vorhanden. Prüfen, ob eine der beiden Angaben reicht.
 - [ ] Reste des alten `Data`-Traits entfernen (von dir bereits als „kann weg" freigegeben)
+- [ ] Die Datenerzeugung von `cnn_lines` steht doppelt (Beispiel und Test). Gemeinsames Modul für Beispiele und Tests schaffen.
 - [ ] Namen und Doku über alle Crates einheitlich (Deutsch/Englisch) machen
 - [ ] Prüfen, ob `Optimizer::step` einen eigenen Fehlertyp braucht (z. B. bei `batch_size == 0`)
 - [ ] Stolperstein dokumentieren: Bei Literalen wie `Sgd::new(0.1)` kann Rust `f64` statt `f32` wählen, wenn es nichts anderes ableiten kann
@@ -114,4 +121,5 @@ Lernraten-Pläne:
 - [x] Optimierer mit Gedächtnis in Form des Netzes (`Trainable::Shape`), kein handgezähltes `P` mehr
 - [x] Momentum, Adam, AdamW
 - [x] `Trainer` (Loss + Optimizer + Batchgröße) und Lernraten-Pläne (`Constant`, `StepDecay`, `LinearDecay`)
+- [x] `Conv2d`, `MaxPool2d`, `AvgPool2d` mit Gradienten-Check und Training im Test
 - [x] Beliebige Formen: `Values` für beliebig tief verschachtelte Arrays, `Loss`/`Trainer` für jede Form, `Elementwise` für jede Form, `Reshape` zum Umordnen (z. B. Bild zu Vektor)

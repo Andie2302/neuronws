@@ -107,3 +107,8 @@ impl<T: Scalar, A: Values<T>, B: Values<T>> Values<T> for (A, B) {
         }
     }
 }
+
+/// Ein Bild mit `C` Kanälen, `H` Zeilen und `W` Spalten: `image[kanal][zeile][spalte]`.
+///
+/// Nur eine lesbare Abkürzung für `[[[T; W]; H]; C]`.
+pub type Image<const C: usize, const H: usize, const W: usize, T = f32> = [[[T; W]; H]; C];

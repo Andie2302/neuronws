@@ -41,3 +41,7 @@ required-features = ["libm"]
 [[example]]
 name = "adam_classifier"
 required-features = ["libm"]
+
+[[example]]
+name = "cnn_lines"
+required-features = ["libm"]
