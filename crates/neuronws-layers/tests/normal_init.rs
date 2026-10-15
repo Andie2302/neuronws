@@ -2,7 +2,7 @@
 #![cfg(any(feature = "std", feature = "libm"))]
 
 use neuronws_layers::block::Block;
-use neuronws_layers::conv::Conv2d;
+use neuronws_layers::conv::Conv2dValid;
 use neuronws_layers::dense_layer::{DenseLayer, Linear};
 use neuronws_layers::init::{HeNormal, Initializer, Normal, Orthogonal, Uniform, XavierNormal};
 use neuronws_layers::random::Rng;
@@ -187,7 +187,7 @@ fn orthogonal_is_deterministic_and_different_per_seed() {
 fn convolution_kernels_are_orthogonal_per_output_channel() {
     // Jeder Ausgabekanal ist eine Zeile der Länge C_IN·KH·KW = 18.
     let conv = Block::initialized(
-        Conv2d::<2, 3, 5, 5, 3, 3, 3, 3, f64>::new(),
+        Conv2dValid::<2, 3, 5, 5, 3, 3, 3, 3, f64>::new(),
         &Orthogonal(1.0),
         &mut Rng::new(6),
     );

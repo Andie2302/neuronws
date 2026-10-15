@@ -16,7 +16,7 @@ use crate::values::Image;
 /// 0. Sind mehrere Werte gleich groß, zählt der erste (zeilenweise).
 ///
 /// Die Ausgabegröße steht als eigene Zahl da und wird beim Kompilieren geprüft (erst beim Bauen,
-/// nicht bei `cargo check`):
+/// nicht bei `cargo check`, außer man schreibt sie zusätzlich in [`check_sizes!`](crate::check_sizes)):
 ///
 /// ```compile_fail
 /// use neuronws_layers::pooling::MaxPool2d;

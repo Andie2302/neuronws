@@ -13,7 +13,8 @@ use crate::values::{self, Values};
 /// Reihenfolge (siehe [`Values`]). Hat keine Parameter.
 ///
 /// Beide Formen müssen gleich viele Zahlen haben. Das prüft der Compiler, allerdings erst beim
-/// Bauen (`cargo build`, `cargo test`), nicht bei `cargo check`:
+/// Bauen (`cargo build`, `cargo test`), nicht bei `cargo check`. Schon bei `cargo check` meldet es
+/// [`check_sizes!`](crate::check_sizes):
 ///
 /// ```compile_fail
 /// use neuronws_layers::reshape::Reshape;

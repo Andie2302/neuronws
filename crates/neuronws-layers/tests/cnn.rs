@@ -6,7 +6,7 @@ use neuronws_layers::activation_layer::Elementwise;
 use neuronws_layers::adam::AdamW;
 use neuronws_layers::block::Block;
 use neuronws_layers::chain::LayerExt;
-use neuronws_layers::conv::Conv2d;
+use neuronws_layers::conv::Conv2dValid;
 use neuronws_layers::dense_layer::Linear;
 use neuronws_layers::init::{He, Xavier};
 use neuronws_layers::loss::CategoricalCrossEntropy;
@@ -56,19 +56,24 @@ fn a_small_cnn_tells_vertical_horizontal_and_diagonal_lines_apart() {
     let train = make_data(&mut rng, 40);
     let test = make_data(&mut rng, 100);
 
-    let mut net = Block::initialized(Conv2d::<1, 4, 6, 6, 3, 3, 4, 4>::new(), &He, &mut rng)
-        .then(Block::<Elementwise<Image<4, 4, 4>, Relu>>::new(Relu))
-        .then(Block::from_parts(MaxPool2d::<4, 4, 4, 2, 2, 2>::new(), ()))
-        .then(Block::from_parts(
-            Reshape::<Image<4, 2, 2>, [f32; 16]>::new(),
-            (),
-        ))
-        .then(neurons(
-            Linear::<16, 3>::new(),
-            &Xavier,
-            Softmax::<3>::new(),
-            &mut rng,
-        ));
+    // Faltung und ReLU in einem Aufruf: `neurons` kennt keine Formen und geht deshalb auch für Bilder.
+    let mut net = neurons(
+        Conv2dValid::<1, 4, 6, 6, 3, 3, 4, 4>::new(),
+        &He,
+        Elementwise::new(Relu),
+        &mut rng,
+    )
+    .then(Block::from_parts(MaxPool2d::<4, 4, 4, 2, 2, 2>::new(), ()))
+    .then(Block::from_parts(
+        Reshape::<Image<4, 2, 2>, [f32; 16]>::new(),
+        (),
+    ))
+    .then(neurons(
+        Linear::<16, 3>::new(),
+        &Xavier,
+        Softmax::<3>::new(),
+        &mut rng,
+    ));
 
     let mut trainer = Trainer::new(
         CategoricalCrossEntropy,
@@ -92,7 +97,7 @@ fn a_small_cnn_tells_vertical_horizontal_and_diagonal_lines_apart() {
 #[test]
 fn the_cnn_has_as_few_parameters_as_expected() {
     type Net = neuronws_layers::chain::Chain<
-        neuronws_layers::conv::Conv2dLayer<1, 4, 6, 6, 3, 3, 4, 4>,
+        neuronws_layers::conv::Conv2dValidLayer<1, 4, 6, 6, 3, 3, 4, 4>,
         neuronws_layers::dense_layer::DenseLayer<16, 3>,
     >;
     // Faltung 4·(3·3) + 4, Dense 16·3 + 3
