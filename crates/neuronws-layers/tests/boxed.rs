@@ -84,3 +84,12 @@ fn a_boxed_optimizer_works_too() {
     trainer.optimizer_mut().set_learning_rate(0.5);
     assert_eq!(trainer.optimizer().learning_rate(), 0.5);
 }
+
+#[test]
+fn a_chain_of_boxes_is_only_as_big_as_its_pointers() {
+    // Das ist der Zweck der Boxen: Die Kette liegt auf dem Stack, die Schichten auf dem Heap.
+    let pointer = core::mem::size_of::<usize>();
+    assert_eq!(core::mem::size_of::<Boxed>(), 3 * pointer);
+    // Dieselben Schichten ohne Box tragen alle Arrays in der Kette selbst.
+    assert!(core::mem::size_of::<Plain>() > 5 * core::mem::size_of::<Boxed>());
+}

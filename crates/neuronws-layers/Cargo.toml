@@ -49,3 +49,11 @@ required-features = ["libm"]
 [[example]]
 name = "cnn_lines"
 required-features = ["libm"]
+
+[[example]]
+name = "stack_budget"
+required-features = ["libm"]
+
+[[example]]
+name = "bench_conv"
+required-features = ["libm"]

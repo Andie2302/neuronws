@@ -25,6 +25,48 @@
 //! Gebaut wird eine Schicht trotzdem zuerst auf dem Stack und dann verschoben. Der Stack muss
 //! also die **größte einzelne** Schicht aushalten, nicht das ganze Netz. Ohne `unsafe` (das ist
 //! im ganzen Projekt verboten) geht es nicht anders.
+//!
+//! # Wie viel Stack braucht ein Netz?
+//!
+//! Gemessen mit `examples/stack_budget.rs`: Das Programm startet sich für jedes Netz mit
+//! verschieden großen Stacks und sucht den kleinsten, bei dem ein Lernschritt (vorwärts,
+//! rückwärts, Optimierer-Schritt mit AdamW) noch läuft. "Größe" ist `size_of` von Netz und
+//! Optimierer zusammen. Alle Zahlen für `f32`, auf dem Rechner, auf dem das geschrieben wurde
+//! (x86-64):
+//!
+//! ```text
+//!                                    Größe     Stack mindestens
+//!                                    im RAM    Release    Debug
+//! Dense 784 → 64 → 10                 812 KB    1052 KB   4255 KB
+//! Faltung  8 und 16 Kanäle            276 KB     591 KB   2008 KB
+//! Faltung 16 und 32 Kanäle            583 KB    1193 KB   4116 KB
+//! Faltung 32 und 64 Kanäle           1304 KB    2575 KB   8817 KB
+//! Faltung 64 und 128 Kanäle          3177 KB    5852 KB  20211 KB
+//! 32/64, jede Schicht in einer Box      0 KB     517 KB   2063 KB
+//! 64/128, jede Schicht in einer Box     0 KB    1459 KB   6122 KB
+//! ```
+//!
+//! Zum Vergleich: Ein Test-Thread hat 2048 KB Stack, der Haupt-Thread meist 8192 KB.
+//!
+//! Daraus folgt:
+//!
+//! - **Faustregel:** Im Release-Build braucht ein Lernschritt etwa doppelt so viel Stack, wie
+//!   Netz und Optimierer groß sind. Im Debug-Build das Vier- bis Sechsfache, weil dort jede
+//!   Rückgabe und jedes `.then(...)` das Netz kopiert und der Compiler die Kopien nicht
+//!   zusammenlegt. Das Netz `32/64` ist 1,3 MB groß und läuft in einem Test-Thread (2 MB) schon
+//!   nicht mehr.
+//! - Jede Schicht legt Eingabe, Ausgabe und Gradient der Eingabe als eigene Arrays an, bei Bildern
+//!   also dreimal die Größe der Aktivierung. Der Optimierer kommt mit ein bis zwei Kopien der
+//!   Parameter dazu (Momentum eine, Adam zwei).
+//! - Mit einer `Box` pro Schicht bleibt nur noch die größte einzelne Schicht (und der
+//!   Zwischenwert beim Rechnen) auf dem Stack. Das bringt im Release-Build etwa den Faktor 4 bis 5.
+//! - Ein größerer Stack hilft mit `std` sofort: `std::thread::Builder::new().stack_size(...)`.
+//!
+//! **Ohne `alloc` und ohne `std`** (Mikrocontroller) gibt es nur den Weg, das Netz klein zu halten
+//! und seine Größe vorher zu kennen: `core::mem::size_of::<Netz>()` und
+//! `core::mem::size_of_val(&optimizer)` sind exakt, und ein `static` im Flash oder RAM hält Netz
+//! und Optimierer außerhalb des Stacks (ein `static mut` bräuchte `unsafe`, das dieses Projekt
+//! verbietet, in einer eigenen Anwendung hilft ein Zellentyp aus deren Laufzeit).
 
 use alloc::boxed::Box;
 

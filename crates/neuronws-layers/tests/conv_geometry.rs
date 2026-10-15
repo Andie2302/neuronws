@@ -263,6 +263,17 @@ mod conv2d {
     }
 
     #[test]
+    fn wide_rows_use_the_strip_wise_backward_pass_and_agree_with_the_formula() {
+        // Ab 16 Ausgabespalten rechnet die Rückwärtsrechnung über Streifen, darunter über jede
+        // Ausgabestelle. Beide müssen dasselbe liefern, deshalb hier breite Zeilen mit allen
+        // Geometrien: Rand, Schrittweite, Dilation, mehrere Kanäle.
+        check_conv2d::<1, 2, 6, 20, 3, 3, 1, 1, 1, 6, 20>(); // same, Zeilenbreite 20
+        check_conv2d::<2, 1, 5, 24, 3, 5, 1, 0, 1, 3, 20>(); // valid, nicht quadratischer Kern
+        check_conv2d::<1, 2, 7, 40, 3, 3, 2, 1, 2, 3, 19>(); // Schrittweite 2 und Dilation 2
+        check_conv2d::<2, 2, 4, 33, 2, 3, 1, 2, 3, 5, 31>(); // großer Rand, Dilation 3
+    }
+
+    #[test]
     fn same_padding_keeps_the_image_size_in_the_layer() {
         const P: usize = same_padding(3, 1);
         let layer = Conv2dLayer::<1, 1, 6, 6, 3, 3, 1, P, 1, 6, 6>::new([[[[0.0; 3]; 3]]], [1.0]);

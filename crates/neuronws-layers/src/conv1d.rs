@@ -28,7 +28,7 @@ pub type Kernels1d<const C_OUT: usize, const C_IN: usize, const K: usize, T = f3
 /// Werte außerhalb der Folge (im Rand) zählen als 0. Die Ausgabelänge ist
 /// `OL = (L + 2·PAD − DIL·(K − 1) − 1) / STRIDE + 1`, siehe [`conv_output_size`], und steht wie
 /// bei der 2D-Faltung als eigene Zahl da. Für den einfachen Fall gibt es [`Conv1dValid`] und
-/// das Makro [`conv1d!`](crate::conv1d).
+/// das Makro [`conv1d!`](macro@crate::conv1d).
 ///
 /// ```
 /// use neuronws_layers::conv1d::Conv1dValidLayer;

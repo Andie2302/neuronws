@@ -159,6 +159,111 @@ pub(crate) const fn tap(
     if index < size { Some(index) } else { None }
 }
 
+/// Die Ausgabestellen `first..end`, bei denen der Kernpunkt `k` im Bild liegt (und nicht im Rand).
+///
+/// Für diese Stellen `c` ist `c · stride + k · dilation − padding` ein gültiger Index in `0..size`.
+/// So muss die innere Schleife nicht bei jedem Schritt auf den Rand prüfen und läuft über ein
+/// zusammenhängendes Stück, das der Compiler gut in Vektorbefehle übersetzen kann.
+#[inline]
+pub(crate) const fn valid_outputs(
+    k: usize,
+    stride: usize,
+    dilation: usize,
+    padding: usize,
+    size: usize,
+    outputs: usize,
+) -> (usize, usize) {
+    let offset = k * dilation;
+    // erste Stelle, bei der `c · stride + offset ≥ padding`
+    let first = if offset >= padding {
+        0
+    } else {
+        (padding - offset).div_ceil(stride)
+    };
+    // eine hinter der letzten Stelle, bei der `c · stride + offset − padding ≤ size − 1`
+    let end = if size + padding > offset {
+        let last = (size - 1 + padding - offset) / stride;
+        if last + 1 < outputs {
+            last + 1
+        } else {
+            outputs
+        }
+    } else {
+        0
+    };
+    if end < first {
+        (first, first)
+    } else {
+        (first, end)
+    }
+}
+
+/// `out[c] += weight · source[c · STRIDE]` für jede Stelle von `out`. Bei Schrittweite 1 sind
+/// beide Streifen zusammenhängend, das ist die Form, die der Compiler vektorisiert.
+#[inline(always)]
+fn add_scaled<T: Scalar, const STRIDE: usize>(out: &mut [T], weight: T, source: &[T]) {
+    if STRIDE == 1 {
+        for (o, &x) in out.iter_mut().zip(source) {
+            *o += weight * x;
+        }
+    } else {
+        for (o, &x) in out.iter_mut().zip(source.iter().step_by(STRIDE)) {
+            *o += weight * x;
+        }
+    }
+}
+
+/// `Σ_c grads[c] · source[c · STRIDE]`.
+///
+/// Bei Schrittweite 1 wird in acht getrennten Teilsummen gerechnet, die erst am Ende
+/// zusammenkommen. Eine einzige laufende Summe zwingt die Rechnung, bei jeder Addition auf die
+/// vorige zu warten. Mit acht Teilsummen laufen die Additionen nebeneinander (und als
+/// Vektorbefehle). Die Reihenfolge der Rundungen ändert sich dadurch leicht, das Ergebnis ist
+/// nicht schlechter, nur anders gerundet. Bei größerer Schrittweite bringt das nichts (die Werte
+/// liegen nicht nebeneinander), dort wird einfach der Reihe nach summiert.
+#[inline(always)]
+fn scaled_sum<T: Scalar, const STRIDE: usize>(grads: &[T], source: &[T]) -> T {
+    if STRIDE != 1 {
+        return grads
+            .iter()
+            .zip(source.iter().step_by(STRIDE))
+            .fold(T::ZERO, |sum, (&g, &x)| sum + g * x);
+    }
+
+    const LANES: usize = 8;
+    let mut partial = [T::ZERO; LANES];
+    // `source` ist meist länger als `grads` (es reicht bis zum Zeilenende). Zusammengehören nur die
+    // ersten `grads.len()` Werte.
+    let full = grads.len() / LANES * LANES;
+    for (g_chunk, x_chunk) in grads[..full]
+        .chunks_exact(LANES)
+        .zip(source[..full].chunks_exact(LANES))
+    {
+        for lane in 0..LANES {
+            partial[lane] += g_chunk[lane] * x_chunk[lane];
+        }
+    }
+    let mut sum = partial.iter().fold(T::ZERO, |sum, &p| sum + p);
+    for (&g, &x) in grads[full..].iter().zip(&source[full..]) {
+        sum += g * x;
+    }
+    sum
+}
+
+/// `target[c · STRIDE] += weight · grads[c]` für jede Stelle von `grads`.
+#[inline(always)]
+fn add_scaled_to_strided<T: Scalar, const STRIDE: usize>(target: &mut [T], weight: T, grads: &[T]) {
+    if STRIDE == 1 {
+        for (t, &g) in target.iter_mut().zip(grads) {
+            *t += weight * g;
+        }
+    } else {
+        for (t, &g) in target.iter_mut().step_by(STRIDE).zip(grads) {
+            *t += weight * g;
+        }
+    }
+}
+
 /// Zweidimensionale Faltung.
 ///
 /// An jeder Stelle des Bildes wird die Summe aus Kern mal darunterliegenden Bildwerten (über alle
@@ -300,25 +405,32 @@ impl<
     type Output = Image<C_OUT, OH, OW, T>;
     type Params = (Kernels<C_OUT, C_IN, KH, KW, T>, [T; C_OUT]);
 
+    /// Die Schleifen laufen **über die Kernpunkte außen** und über die Ausgabestellen innen: Für jedes
+    /// Gewicht wird ein ganzer Streifen der Ausgabezeile in einem Zug aktualisiert. Jede einzelne
+    /// Ausgabe summiert ihre Beiträge dabei in derselben Reihenfolge wie die einfache Schleife
+    /// über `(i, p, q)`, das Ergebnis ist also dasselbe, nur schneller.
     fn forward(&self, (kernels, bias): &Self::Params, input: &Self::Input) -> Self::Output {
         let mut output = [[[T::ZERO; OW]; OH]; C_OUT];
         for (o, out_channel) in output.iter_mut().enumerate() {
-            for (r, out_row) in out_channel.iter_mut().enumerate() {
-                for (c, cell) in out_row.iter_mut().enumerate() {
-                    let mut sum = bias[o];
-                    for (i, plane) in input.iter().enumerate() {
-                        for (p, kernel_row) in kernels[o][i].iter().enumerate() {
-                            let Some(row) = tap(r, p, STRIDE, DIL, PAD, H) else {
+            for row in out_channel.iter_mut() {
+                row.fill(bias[o]);
+            }
+            for (i, plane) in input.iter().enumerate() {
+                for (p, kernel_row) in kernels[o][i].iter().enumerate() {
+                    for (q, &weight) in kernel_row.iter().enumerate() {
+                        let (first, end) = valid_outputs(q, STRIDE, DIL, PAD, W, OW);
+                        let start = first * STRIDE + q * DIL - PAD;
+                        for (r, out_row) in out_channel.iter_mut().enumerate() {
+                            let Some(source_row) = tap(r, p, STRIDE, DIL, PAD, H) else {
                                 continue;
                             };
-                            for (q, &weight) in kernel_row.iter().enumerate() {
-                                if let Some(col) = tap(c, q, STRIDE, DIL, PAD, W) {
-                                    sum += weight * plane[row][col];
-                                }
-                            }
+                            add_scaled::<T, STRIDE>(
+                                &mut out_row[first..end],
+                                weight,
+                                &plane[source_row][start..],
+                            );
                         }
                     }
-                    *cell = sum;
                 }
             }
         }
@@ -328,6 +440,13 @@ impl<
     /// Jede Ausgabestelle `(o, r, c)` mit Gradient `g` trägt über jeden Kernpunkt `(i, p, q)`, der
     /// im Bild liegt (Pixel `(y, x)`), bei:
     /// `∂L/∂b[o] += g`, `∂L/∂K[o][i][p][q] += g · x[i][y][x]`, `∂L/∂x[i][y][x] += K[o][i][p][q] · g`.
+    ///
+    /// Es gibt zwei Schleifenanordnungen mit demselben Ergebnis (bis auf die Rundung der letzten
+    /// Stelle). Bei **breiten** Ausgabezeilen läuft die Rechnung wie vorwärts über die Kernpunkte
+    /// außen und ganze Streifen innen. Bei **schmalen** Zeilen ist der Aufwand pro Streifen größer
+    /// als sein Nutzen, dort ist die einfache Schleife über jede Ausgabestelle schneller. Welche
+    /// gilt, steht beim Kompilieren fest (`OW` ist eine Konstante). Gemessen wurde mit
+    /// `examples/bench_conv.rs`.
     fn backward(
         &self,
         (kernels, _): &Self::Params,
@@ -336,20 +455,59 @@ impl<
         _output: &Self::Output,
         grad_output: &Self::Output,
     ) -> Self::Input {
-        let mut grad_input = [[[T::ZERO; W]; H]; C_IN];
+        /// Ab so vielen Ausgabespalten gilt die Anordnung "Kernpunkte außen".
+        const WIDE_ROWS: usize = 16;
+
         for (o, grad_channel) in grad_output.iter().enumerate() {
-            for (r, grad_row) in grad_channel.iter().enumerate() {
-                for (c, &g) in grad_row.iter().enumerate() {
+            for row in grad_channel {
+                for &g in row {
                     grad_bias[o] += g;
-                    for (i, plane) in input.iter().enumerate() {
-                        for p in 0..KH {
-                            let Some(row) = tap(r, p, STRIDE, DIL, PAD, H) else {
-                                continue;
-                            };
-                            for q in 0..KW {
-                                if let Some(col) = tap(c, q, STRIDE, DIL, PAD, W) {
-                                    grad_kernels[o][i][p][q] += g * plane[row][col];
-                                    grad_input[i][row][col] += kernels[o][i][p][q] * g;
+                }
+            }
+        }
+
+        let mut grad_input = [[[T::ZERO; W]; H]; C_IN];
+        if OW >= WIDE_ROWS {
+            for (o, grad_channel) in grad_output.iter().enumerate() {
+                for (i, plane) in input.iter().enumerate() {
+                    for p in 0..KH {
+                        for q in 0..KW {
+                            let weight = kernels[o][i][p][q];
+                            let (first, end) = valid_outputs(q, STRIDE, DIL, PAD, W, OW);
+                            let start = first * STRIDE + q * DIL - PAD;
+                            let mut kernel_gradient = grad_kernels[o][i][p][q];
+                            for (r, grad_row) in grad_channel.iter().enumerate() {
+                                let Some(source_row) = tap(r, p, STRIDE, DIL, PAD, H) else {
+                                    continue;
+                                };
+                                let grads = &grad_row[first..end];
+                                kernel_gradient +=
+                                    scaled_sum::<T, STRIDE>(grads, &plane[source_row][start..]);
+                                add_scaled_to_strided::<T, STRIDE>(
+                                    &mut grad_input[i][source_row][start..],
+                                    weight,
+                                    grads,
+                                );
+                            }
+                            grad_kernels[o][i][p][q] = kernel_gradient;
+                        }
+                    }
+                }
+            }
+        } else {
+            for (o, grad_channel) in grad_output.iter().enumerate() {
+                for (r, grad_row) in grad_channel.iter().enumerate() {
+                    for (c, &g) in grad_row.iter().enumerate() {
+                        for (i, plane) in input.iter().enumerate() {
+                            for p in 0..KH {
+                                let Some(row) = tap(r, p, STRIDE, DIL, PAD, H) else {
+                                    continue;
+                                };
+                                for q in 0..KW {
+                                    if let Some(col) = tap(c, q, STRIDE, DIL, PAD, W) {
+                                        grad_kernels[o][i][p][q] += g * plane[row][col];
+                                        grad_input[i][row][col] += kernels[o][i][p][q] * g;
+                                    }
                                 }
                             }
                         }
