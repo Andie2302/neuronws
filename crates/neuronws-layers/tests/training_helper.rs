@@ -6,9 +6,9 @@ use neuronws_layers::training::{mean_loss, train_epoch};
 use neuronws_layers::traits::{BackwardPathMut, ForwardPathMut, Trainable};
 
 type Line = DenseLayer<1, 1, f32>;
-type Data = [([f32; 1], [f32; 1]); 5];
+type LineData = [([f32; 1], [f32; 1]); 5];
 
-fn line_data() -> Data {
+fn line_data() -> LineData {
     [-2.0, -1.0, 0.0, 1.0, 2.0].map(|x: f32| ([x], [2.0 * x + 1.0]))
 }
 

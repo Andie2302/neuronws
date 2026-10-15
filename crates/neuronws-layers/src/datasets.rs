@@ -27,6 +27,14 @@ pub mod logic {
         ([1.0, 1.0], 1.0),
     ];
 
+    /// Das Gegenteil von UND: Nur bei zwei Einsen kommt 0 heraus. Mit `OR` zusammen ergibt es XOR.
+    pub const NAND: Table = [
+        ([0.0, 0.0], 1.0),
+        ([0.0, 1.0], 1.0),
+        ([1.0, 0.0], 1.0),
+        ([1.0, 1.0], 0.0),
+    ];
+
     /// Nicht linear trennbar: Kein einzelnes Neuron kann XOR lernen.
     pub const XOR: Table = [
         ([0.0, 0.0], 0.0),

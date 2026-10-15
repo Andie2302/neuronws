@@ -182,3 +182,20 @@ fn momentum_refuses_a_batch_of_zero() {
     let mut layer = DenseLayer::new([[1.0]], [0.0]);
     Momentum::<DenseLayer<1, 1>>::new(0.1, 0.9).step(&mut layer, 0);
 }
+
+#[test]
+fn for_model_takes_the_number_type_from_the_net() {
+    // Ein nacktes Literal als Lernrate wird zu f32, weil das Netz f32 ist.
+    let mut net = DenseLayer::new([[1.0_f32]], [0.0]);
+    one_gradient_step(&mut net);
+    let mut sgd = Sgd::for_model(&net, 0.1);
+    sgd.step(&mut net, 1);
+    assert_close(net.weights()[0][0], 1.0 - 0.1 * 2.0);
+
+    // und für ein f64-Netz zu f64
+    let mut double = DenseLayer::<1, 1, f64>::new([[1.0]], [0.0]);
+    double.forward_mut(&[2.0]);
+    double.backward_mut(&[1.0]);
+    Sgd::for_model(&double, 0.1).step(&mut double, 1);
+    assert!((double.weights()[0][0] - 0.8_f64).abs() < 1e-15);
+}

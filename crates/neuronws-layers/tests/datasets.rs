@@ -111,6 +111,13 @@ fn line_sample_refuses_an_unknown_class() {
 }
 
 #[test]
+fn nand_is_the_opposite_of_and() {
+    for (([_, _], and), ([_, _], nand)) in logic::AND.into_iter().zip(logic::NAND) {
+        assert_eq!(nand, 1.0 - and);
+    }
+}
+
+#[test]
 fn the_logic_gates_have_the_right_truth_tables() {
     for ([a, b], target) in logic::AND {
         assert_eq!(target, f32::from(a == 1.0 && b == 1.0));

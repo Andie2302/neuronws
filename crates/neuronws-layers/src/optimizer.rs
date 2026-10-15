@@ -41,6 +41,42 @@ pub trait HasLearningRate<T: Scalar> {
 }
 
 /// Stochastic Gradient Descent: `p ← p − η · g`.
+///
+/// # Stolperstein: `f32` oder `f64`?
+///
+/// Der Zahlentyp von `Sgd<T>` muss zum Netz passen. Bei einem Literal wie `Sgd::new(0.1)` leitet
+/// Rust ihn meist aus der späteren Benutzung ab (das Netz rechnet mit `f32`, also ist es `f32`).
+/// Gibt es **nichts**, woraus Rust ihn ableiten kann, nimmt es für eine Kommazahl-Konstante `f64`.
+/// Und eine Variable hat ihren Typ schon: Kommt der Wert aus einer `f64`-Rechnung, wird es
+/// `Sgd<f64>`, und der Fehler (`Sgd<f64>` ist kein Optimierer für dieses Netz) erscheint erst
+/// bei `step`, weit weg von der Ursache:
+///
+/// ```compile_fail
+/// use neuronws_layers::dense_layer::DenseLayer;
+/// use neuronws_layers::optimizer::{Optimizer, Sgd};
+///
+/// let learning_rate: f64 = 0.1; // zum Beispiel das Ergebnis einer Rechnung mit f64
+/// let mut sgd = Sgd::new(learning_rate); // also `Sgd<f64>`
+/// let mut net = DenseLayer::new([[0.0_f32]], [0.0]);
+/// sgd.step(&mut net, 1); // Fehler: `Sgd<f64>` passt nicht zu einem `f32`-Netz
+/// ```
+///
+/// Es gibt drei Wege, das zu vermeiden. Am einfachsten ist [`Sgd::for_model`], dort bestimmt das
+/// Netz den Typ:
+///
+/// ```
+/// use neuronws_layers::dense_layer::DenseLayer;
+/// use neuronws_layers::optimizer::{Optimizer, Sgd};
+///
+/// let mut net = DenseLayer::new([[0.0_f32]], [0.0]);
+///
+/// let mut by_model = Sgd::for_model(&net, 0.1); // der Typ folgt aus dem Netz
+/// let mut by_suffix = Sgd::new(0.1_f32); // oder ausdrücklich über das Suffix
+/// let mut by_turbofish = Sgd::<f32>::new(0.1); // oder über den Typ
+/// by_model.step(&mut net, 1);
+/// by_suffix.step(&mut net, 1);
+/// by_turbofish.step(&mut net, 1);
+/// ```
 #[derive(Debug, Clone)]
 pub struct Sgd<T: Scalar = f32> {
     learning_rate: T,
@@ -49,6 +85,13 @@ pub struct Sgd<T: Scalar = f32> {
 impl<T: Scalar> Sgd<T> {
     pub const fn new(learning_rate: T) -> Self {
         Self { learning_rate }
+    }
+
+    /// Wie `new`, aber der Zahlentyp ergibt sich aus dem Netz: Ein `f32`-Netz bekommt einen
+    /// `Sgd<f32>`, ein `f64`-Netz einen `Sgd<f64>`, auch wenn die Lernrate ein nacktes Literal ist.
+    /// Das vermeidet den Stolperstein oben. (`Momentum`, `RmsProp` und `Adam` haben dasselbe.)
+    pub fn for_model<M: Trainable<Scalar = T>>(_model: &M, learning_rate: T) -> Self {
+        Self::new(learning_rate)
     }
 }
 
