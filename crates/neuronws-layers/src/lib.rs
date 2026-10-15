@@ -15,10 +15,15 @@ pub mod boxed;
 pub mod chain;
 pub mod conv;
 pub mod dense_layer;
+pub mod diagonal;
+pub mod dropout;
+pub mod each;
 pub mod gradcheck;
 pub mod init;
 pub mod loss;
 pub mod neurons;
+#[cfg(any(feature = "std", feature = "libm"))]
+pub mod norm;
 pub mod optimizer;
 pub mod pooling;
 pub mod random;
