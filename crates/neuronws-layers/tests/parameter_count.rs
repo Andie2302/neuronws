@@ -2,8 +2,8 @@ use neuronws_layers::activation::Relu;
 use neuronws_layers::activation_layer::ActivationLayer;
 use neuronws_layers::chain::{Chain, LayerExt};
 use neuronws_layers::dense_layer::DenseLayer;
-use neuronws_layers::optimizer::Momentum;
 use neuronws_layers::traits::Trainable;
+use neuronws_layers::values::Values;
 
 fn visited<M: Trainable>(model: &mut M) -> usize {
     let mut count = 0;
@@ -44,9 +44,10 @@ fn the_constant_matches_what_visit_parameters_really_visits() {
 }
 
 #[test]
-fn p_can_be_taken_from_the_model_type() {
+fn the_optimizer_memory_shape_follows_from_the_model_type() {
     type Net = Chain<DenseLayer<2, 3>, DenseLayer<3, 1>>;
     const P: usize = <Net as Trainable>::PARAMETER_COUNT;
-    let _momentum = Momentum::<P>::new(0.1, 0.9);
     assert_eq!(P, 13);
+    // Das Gedächtnis des Optimierers hat genau so viele Plätze, ohne dass man P hinschreibt.
+    assert_eq!(<<Net as Trainable>::Shape as Values<f32>>::LEN, P);
 }

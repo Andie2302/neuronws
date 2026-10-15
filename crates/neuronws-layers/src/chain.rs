@@ -88,6 +88,8 @@ where
 
 impl<A: Trainable, B: Trainable<Scalar = A::Scalar>> Trainable for Chain<A, B> {
     type Scalar = A::Scalar;
+    /// Erst die Plätze der ersten, dann die der zweiten Schicht, wie beim Besuchen.
+    type Shape = (A::Shape, B::Shape);
 
     const PARAMETER_COUNT: usize = A::PARAMETER_COUNT + B::PARAMETER_COUNT;
 

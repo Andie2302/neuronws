@@ -1,3 +1,6 @@
+use crate::scalar::Scalar;
+use crate::values::Values;
+
 pub trait Layer {}
 
 pub trait ForwardData {
@@ -30,7 +33,13 @@ pub trait BackwardPathMut: BackwardData {
 /// Der Besucher (`visitor`) bekommt jeden Parameter und seinen aufsummierten Gradienten.
 /// Was damit passiert, entscheidet der Optimierer, nicht die Schicht.
 pub trait Trainable {
-    type Scalar;
+    type Scalar: Scalar;
+
+    /// Ein Platz pro Parameter, in der Reihenfolge von `visit_parameters`.
+    ///
+    /// Optimierer mit Gedächtnis (Momentum, Adam, …) legen darin pro Parameter ihre Zusatzwerte
+    /// ab. Weil der Typ aus dem Modell folgt, kann die Größe nie falsch sein.
+    type Shape: Values<Self::Scalar>;
 
     /// Anzahl der lernbaren Parameter, so viele ruft `visit_parameters` auf.
     const PARAMETER_COUNT: usize;

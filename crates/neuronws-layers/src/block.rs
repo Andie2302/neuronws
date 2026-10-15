@@ -133,6 +133,7 @@ impl<Op: Operation> BackwardPathMut for Block<Op> {
 
 impl<Op: Operation> Trainable for Block<Op> {
     type Scalar = Op::Scalar;
+    type Shape = Op::Params;
 
     const PARAMETER_COUNT: usize = <Op::Params as Values<Op::Scalar>>::LEN;
 

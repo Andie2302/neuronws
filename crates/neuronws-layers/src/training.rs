@@ -28,7 +28,7 @@ where
     M: ForwardPathMut<ForwardInput = [T; IN], ForwardOutput = [T; OUT]>
         + BackwardPathMut<BackwardInput = [T; OUT], BackwardOutput = [T; IN]>
         + Trainable<Scalar = T>,
-    O: Optimizer<T>,
+    O: Optimizer<M>,
     L: Loss<OUT>,
 {
     assert!(batch_size > 0, "batch_size muss größer als 0 sein");

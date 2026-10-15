@@ -45,7 +45,7 @@ fn a_cloned_chain_keeps_working_and_stays_independent() {
 #[test]
 fn a_cloned_optimizer_carries_its_velocity() {
     let mut layer = DenseLayer::<1, 1, f32>::new([[1.0]], [0.0]);
-    let mut momentum = Momentum::<2>::new(0.1, 0.9);
+    let mut momentum = Momentum::for_model(&layer, 0.1, 0.9);
     layer.forward_mut(&[2.0]);
     layer.backward_mut(&[1.0]);
     momentum.step(&mut layer, 1);

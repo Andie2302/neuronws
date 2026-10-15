@@ -141,7 +141,7 @@ fn check_binary_cross_entropy_gradient<T: Scalar + Into<f64>>(p: &Precision) {
 fn check_momentum_formula<T: Scalar + Into<f64>>(p: &Precision) {
     let (lr, mu) = (t::<T>(0.1), t::<T>(0.5));
     let mut layer = DenseLayer::<1, 1, T>::new([[T::ONE]], [T::ZERO]);
-    let mut momentum = Momentum::<2, T>::new(lr, mu);
+    let mut momentum = Momentum::for_model(&layer, lr, mu);
     let (mut w, mut b) = (T::ONE, T::ZERO);
     let (mut vw, mut vb) = (T::ZERO, T::ZERO);
 
@@ -160,7 +160,9 @@ fn check_momentum_formula<T: Scalar + Into<f64>>(p: &Precision) {
 }
 
 fn check_optimizers_learn_a_line<T: Scalar + Into<f64>>(p: &Precision) {
-    fn train<T: Scalar, O: Optimizer<T>>(mut optimizer: O) -> DenseLayer<1, 1, T> {
+    fn train<T: Scalar, O: Optimizer<DenseLayer<1, 1, T>>>(
+        mut optimizer: O,
+    ) -> DenseLayer<1, 1, T> {
         let mut layer = DenseLayer::<1, 1, T>::new([[T::ZERO]], [T::ZERO]);
         let data = [-2.0, -1.0, 0.0, 1.0, 2.0].map(|x| ([t::<T>(x)], [t::<T>(2.0 * x + 1.0)]));
         for _ in 0..400 {
@@ -175,7 +177,7 @@ fn check_optimizers_learn_a_line<T: Scalar + Into<f64>>(p: &Precision) {
 
     for layer in [
         train::<T, _>(Sgd::new(t(0.05))),
-        train::<T, _>(Momentum::<2, T>::new(t(0.02), t(0.9))),
+        train::<T, _>(Momentum::<DenseLayer<1, 1, T>>::new(t(0.02), t(0.9))),
     ] {
         assert_close(
             layer.weights()[0][0],

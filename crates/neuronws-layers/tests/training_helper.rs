@@ -57,8 +57,8 @@ fn every_batch_size_learns_the_line() {
 /// Schreibt mit, mit welchen Gruppengrößen der Optimierer aufgerufen wird.
 struct Recorder(Vec<usize>);
 
-impl Optimizer<f32> for Recorder {
-    fn step<M: Trainable<Scalar = f32>>(&mut self, model: &mut M, batch_size: usize) {
+impl<M: Trainable> Optimizer<M> for Recorder {
+    fn step(&mut self, model: &mut M, batch_size: usize) {
         self.0.push(batch_size);
         model.zero_grad();
     }
