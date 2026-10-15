@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::optimizer::{HasLearningRate, Optimizer};
+use crate::optimizer::{HasLearningRate, Optimizer, batch_divisor};
 use crate::scalar::Scalar;
 use crate::traits::Trainable;
 use crate::values::Values;
@@ -80,7 +80,7 @@ impl<M: Trainable> HasLearningRate<M::Scalar> for AdamW<M> {
 impl<M: Trainable> Optimizer<M> for AdamW<M> {
     fn step(&mut self, model: &mut M, batch_size: usize) {
         let one = M::Scalar::ONE;
-        let batch = M::Scalar::from_usize(batch_size);
+        let batch = batch_divisor::<M::Scalar>(batch_size);
         self.beta1_power = self.beta1_power * self.beta1;
         self.beta2_power = self.beta2_power * self.beta2;
         let correction1 = one - self.beta1_power;
@@ -93,7 +93,7 @@ impl<M: Trainable> Optimizer<M> for AdamW<M> {
         let mut index = 0;
 
         model.visit_parameters(&mut |parameter, gradient| {
-            let g = gradient / batch;
+            let g = *gradient / batch;
             let m = m.value_mut(index);
             let v = v.value_mut(index);
             *m = beta1 * *m + (one - beta1) * g;

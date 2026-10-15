@@ -121,3 +121,64 @@ fn trainable_still_reports_parameters_in_a_stable_order() {
     });
     assert_eq!(seen, [1.0, 2.0, 3.0]); // erst die Gewichte, dann der Bias
 }
+
+#[test]
+fn nesterov_looks_one_momentum_step_ahead() {
+    // Gradient w: 2, b: 1. Mit η = 0.1 und μ = 0.5:
+    //   Schritt 1: v = −η g, Parameter springt um μ v − η g (nicht nur um v).
+    let mut layer = DenseLayer::new([[1.0]], [0.0]);
+    let mut nesterov = Momentum::<DenseLayer<1, 1>>::new(0.1, 0.5).with_nesterov();
+    assert!(nesterov.is_nesterov());
+
+    one_gradient_step(&mut layer);
+    nesterov.step(&mut layer, 1);
+    // v_w = −0.2, Sprung = 0.5·(−0.2) − 0.2 = −0.3
+    assert_close(layer.weights()[0][0], 1.0 - 0.3);
+    // v_b = −0.1, Sprung = 0.5·(−0.1) − 0.1 = −0.15
+    assert_close(layer.bias()[0], -0.15);
+
+    // Schritt 2: v_w = 0.5·(−0.2) − 0.2 = −0.3, Sprung = 0.5·(−0.3) − 0.2 = −0.35
+    one_gradient_step(&mut layer);
+    nesterov.step(&mut layer, 1);
+    assert_close(layer.weights()[0][0], 0.7 - 0.35);
+}
+
+#[test]
+fn nesterov_without_momentum_is_plain_sgd() {
+    let mut a = DenseLayer::new([[1.0]], [0.5]);
+    let mut b = DenseLayer::new([[1.0]], [0.5]);
+    one_gradient_step(&mut a);
+    one_gradient_step(&mut b);
+
+    Sgd::new(0.1).step(&mut a, 1);
+    Momentum::<DenseLayer<1, 1>>::new(0.1, 0.0)
+        .with_nesterov()
+        .step(&mut b, 1);
+
+    assert_eq!(a.weights(), b.weights());
+    assert_eq!(a.bias(), b.bias());
+}
+
+#[test]
+fn nesterov_converges_on_the_line() {
+    let layer = train_line(
+        &mut Momentum::<DenseLayer<1, 1>>::new(0.02, 0.9).with_nesterov(),
+        300,
+    );
+    assert_close(layer.weights()[0][0], 2.0);
+    assert_close(layer.bias()[0], 1.0);
+}
+
+#[test]
+#[should_panic(expected = "batch_size muss größer als 0 sein")]
+fn sgd_refuses_a_batch_of_zero() {
+    let mut layer = DenseLayer::new([[1.0]], [0.0]);
+    Sgd::new(0.1).step(&mut layer, 0);
+}
+
+#[test]
+#[should_panic(expected = "batch_size muss größer als 0 sein")]
+fn momentum_refuses_a_batch_of_zero() {
+    let mut layer = DenseLayer::new([[1.0]], [0.0]);
+    Momentum::<DenseLayer<1, 1>>::new(0.1, 0.9).step(&mut layer, 0);
+}

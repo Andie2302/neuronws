@@ -24,6 +24,18 @@ pub trait Operation {
 
     fn forward(&self, params: &Self::Params, input: &Self::Input) -> Self::Output;
 
+    /// Wie `forward`, aber für einen **Lern**-Durchgang (`ForwardPathMut::forward_mut`).
+    ///
+    /// Hier darf die Operation Zufall ziehen oder ihre Statistik nachführen. Weil sie `&mut self`
+    /// bekommt, kann sie sich merken, was `backward` später braucht (zum Beispiel die
+    /// Dropout-Maske). `forward` bleibt der reine Weg für den Einsatz des fertigen Netzes.
+    ///
+    /// Der Standard rechnet einfach `forward`. Nur Operationen mit Zufall oder Zustand
+    /// überschreiben es.
+    fn forward_train(&mut self, params: &Self::Params, input: &Self::Input) -> Self::Output {
+        self.forward(params, input)
+    }
+
     /// Liefert `∂L/∂Eingabe` und **addiert** `∂L/∂Parameter` zu `grads`.
     ///
     /// `output` ist das Ergebnis von `forward(params, input)`. Es wird mitgegeben, weil sich manche
@@ -82,6 +94,12 @@ impl<Op: Operation> Block<Op> {
         &self.op
     }
 
+    /// Zugriff auf die Operation, um ihre Einstellungen zu ändern (zum Beispiel den Zufallsstart
+    /// von Dropout neu zu setzen).
+    pub const fn operation_mut(&mut self) -> &mut Op {
+        &mut self.op
+    }
+
     pub const fn params(&self) -> &Op::Params {
         &self.params
     }
@@ -106,9 +124,10 @@ impl<Op: Operation> ForwardPath for Block<Op> {
 }
 
 impl<Op: Operation> ForwardPathMut for Block<Op> {
+    /// Rechnet über [`Operation::forward_train`] und merkt sich Eingabe und Ausgabe.
     fn forward_mut(&mut self, input: &Self::ForwardInput) -> &Self::ForwardOutput {
         self.last_input = *input;
-        self.output = self.op.forward(&self.params, input);
+        self.output = self.op.forward_train(&self.params, input);
         &self.output
     }
 }
@@ -135,11 +154,15 @@ impl<Op: Operation> Trainable for Block<Op> {
     type Scalar = Op::Scalar;
     type Shape = Op::Params;
 
-    const PARAMETER_COUNT: usize = <Op::Params as Values<Op::Scalar>>::LEN;
-
-    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut Op::Scalar, Op::Scalar)) {
+    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut Op::Scalar, &mut Op::Scalar)) {
         for index in 0..Self::PARAMETER_COUNT {
-            visitor(self.params.value_mut(index), self.grads.value(index));
+            visitor(self.params.value_mut(index), self.grads.value_mut(index));
+        }
+    }
+
+    fn inspect_parameters(&self, visitor: &mut impl FnMut(Op::Scalar, Op::Scalar)) {
+        for index in 0..Self::PARAMETER_COUNT {
+            visitor(self.params.value(index), self.grads.value(index));
         }
     }
 

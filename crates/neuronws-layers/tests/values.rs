@@ -137,3 +137,46 @@ fn empty_inner_shapes_have_no_values() {
     let empty = [[0.0_f32; 0]; 3];
     empty.value(0);
 }
+
+mod helpers {
+    use neuronws_layers::values::{self, Image};
+
+    #[test]
+    fn from_fn_numbers_the_values() {
+        let matrix: [[f32; 3]; 2] = values::from_fn(|i| i as f32);
+        assert_eq!(matrix, [[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]]);
+    }
+
+    #[test]
+    fn map_and_zip_map_work_on_any_shape() {
+        let image: Image<2, 2, 2> = values::from_fn(|i| i as f32);
+        let doubled = values::map(&image, |x| 2.0 * x);
+        assert_eq!(doubled[1][1][1], 14.0);
+
+        let sum = values::add(&image, &doubled);
+        assert_eq!(sum[1][1][1], 21.0);
+        let product = values::zip_map(&image, &doubled, |a, b| a * b);
+        assert_eq!(product[0][1][0], 2.0 * 2.0 * 2.0);
+    }
+
+    #[test]
+    fn sum_adds_every_number() {
+        assert_eq!(values::sum(&[[1.0_f32, 2.0], [3.0, 4.0]]), 10.0);
+        assert_eq!(values::sum::<f32, ()>(&()), 0.0);
+        assert_eq!(values::sum(&([1.0_f32], [2.0, 3.0])), 6.0);
+    }
+
+    #[test]
+    fn reshape_keeps_the_order() {
+        let flat: [f32; 6] = values::reshape(&[[1.0_f32, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+        assert_eq!(flat, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        let back: [[f32; 2]; 3] = values::reshape(&flat);
+        assert_eq!(back, [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]);
+    }
+
+    #[test]
+    #[should_panic(expected = "gleich viele Zahlen")]
+    fn reshape_to_a_different_size_panics() {
+        let _: [f32; 5] = values::reshape(&[1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    }
+}

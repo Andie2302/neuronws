@@ -112,3 +112,51 @@ impl<T: Scalar, A: Values<T>, B: Values<T>> Values<T> for (A, B) {
 ///
 /// Nur eine lesbare Abkürzung für `[[[T; W]; H]; C]`.
 pub type Image<const C: usize, const H: usize, const W: usize, T = f32> = [[[T; W]; H]; C];
+
+// ---------------------------------------------------------------------------------------------
+// Kleine Helfer, die für jede Form gelten. Sie arbeiten über die Nummerierung von `Values` und
+// brauchen deshalb weder `alloc` noch Wissen über die Verschachtelung.
+// ---------------------------------------------------------------------------------------------
+
+/// Baut eine Gruppe, deren `i`-te Zahl `f(i)` ist.
+pub fn from_fn<T: Scalar, V: Values<T>>(mut f: impl FnMut(usize) -> T) -> V {
+    let mut values = V::zeros();
+    for i in 0..V::LEN {
+        *values.value_mut(i) = f(i);
+    }
+    values
+}
+
+/// Wendet `f` auf jede Zahl an.
+pub fn map<T: Scalar, V: Values<T>>(values: &V, mut f: impl FnMut(T) -> T) -> V {
+    from_fn(|i| f(values.value(i)))
+}
+
+/// Verknüpft zwei gleich geformte Gruppen Zahl für Zahl.
+pub fn zip_map<T: Scalar, V: Values<T>>(a: &V, b: &V, mut f: impl FnMut(T, T) -> T) -> V {
+    from_fn(|i| f(a.value(i), b.value(i)))
+}
+
+/// Die Summe aller Zahlen.
+pub fn sum<T: Scalar, V: Values<T>>(values: &V) -> T {
+    (0..V::LEN).fold(T::ZERO, |sum, i| sum + values.value(i))
+}
+
+/// Zahl für Zahl `a + b`.
+pub fn add<T: Scalar, V: Values<T>>(a: &V, b: &V) -> V {
+    zip_map(a, b, |x, y| x + y)
+}
+
+/// Ordnet dieselben Zahlen in eine andere Form um (zum Beispiel ein Bild zu einem Vektor).
+///
+/// # Panics
+/// Wenn beide Formen nicht gleich viele Zahlen haben.
+pub fn reshape<T: Scalar, From: Values<T>, To: Values<T>>(from: &From) -> To {
+    assert!(
+        From::LEN == To::LEN,
+        "Umformen braucht gleich viele Zahlen, es sind {} und {}",
+        From::LEN,
+        To::LEN
+    );
+    from_fn(|i| from.value(i))
+}

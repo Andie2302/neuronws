@@ -13,7 +13,23 @@ use crate::values::Values;
 /// Der Optimierer ist für ein bestimmtes Modell `M` gemacht. Hat er ein Gedächtnis, ist es genau
 /// so groß wie die Parameter von `M` (`M::Shape`), eine falsche Größe gibt es nicht.
 pub trait Optimizer<M: Trainable> {
+    /// Ein Lernschritt aus den gesammelten Gradienten von `batch_size` Beispielen.
+    ///
+    /// # Panics
+    /// Wenn `batch_size` 0 ist. Es gäbe nichts zu mitteln, und die Division durch 0 würde alle
+    /// Parameter stillschweigend zu `NaN` machen. Ein eigener Fehlertyp wäre hier übertrieben: Die
+    /// Batchgröße kommt in der Praxis aus `chunks()` oder ist eine Konstante, eine 0 ist ein
+    /// Programmierfehler und kein Zustand, auf den man zur Laufzeit reagieren kann.
     fn step(&mut self, model: &mut M, batch_size: usize);
+}
+
+/// Die Batchgröße als Zahl, zum Mitteln der aufsummierten Gradienten.
+///
+/// # Panics
+/// Wenn `batch_size` 0 ist, siehe [`Optimizer::step`].
+pub(crate) fn batch_divisor<T: Scalar>(batch_size: usize) -> T {
+    assert!(batch_size > 0, "batch_size muss größer als 0 sein");
+    T::from_usize(batch_size)
 }
 
 /// Ein Optimierer mit einer Lernrate `η`, die man lesen und ändern kann.
@@ -48,8 +64,8 @@ impl<T: Scalar> HasLearningRate<T> for Sgd<T> {
 
 impl<M: Trainable> Optimizer<M> for Sgd<M::Scalar> {
     fn step(&mut self, model: &mut M, batch_size: usize) {
-        let scale = self.learning_rate / M::Scalar::from_usize(batch_size);
-        model.visit_parameters(&mut |parameter, gradient| *parameter -= scale * gradient);
+        let scale = self.learning_rate / batch_divisor::<M::Scalar>(batch_size);
+        model.visit_parameters(&mut |parameter, gradient| *parameter -= scale * *gradient);
         model.zero_grad();
     }
 }
@@ -58,6 +74,11 @@ impl<M: Trainable> Optimizer<M> for Sgd<M::Scalar> {
 ///
 /// Jeder Parameter merkt sich seine bisherige "Geschwindigkeit" `v`. Das glättet Zickzack-Wege
 /// und beschleunigt das Lernen in Richtungen, in denen der Gradient immer gleich zeigt.
+///
+/// Mit [`with_nesterov`](Momentum::with_nesterov) wird daraus **Nesterov-Momentum**: Der
+/// Parameter springt nicht nur um die neue Geschwindigkeit, sondern schaut dabei schon einen
+/// Impuls-Schritt voraus: `p ← p + μ v − η g` (mit dem neuen `v`). Bei gekrümmten Tälern bremst
+/// das früher ab und schwingt weniger über das Ziel hinaus.
 ///
 /// Das Gedächtnis hat die Form der Parameter des Modells (`M::Shape`). Die Parameter werden in
 /// fester Reihenfolge besucht, und `velocity[i]` gehört zum `i`-ten.
@@ -80,6 +101,7 @@ impl<M: Trainable> Optimizer<M> for Sgd<M::Scalar> {
 ///     Chain::new(ActivationLayer::new(Relu), DenseLayer::new([[0.0; 3]], [0.0])),
 /// );
 /// let _momentum = Momentum::for_model(&net, 0.01, 0.9);
+/// let _nesterov = Momentum::for_model(&net, 0.01, 0.9).with_nesterov();
 /// ```
 ///
 /// Ein Optimierer passt nur zum Modell, für das er gebaut wurde. Das prüft der Compiler:
@@ -95,6 +117,7 @@ impl<M: Trainable> Optimizer<M> for Sgd<M::Scalar> {
 pub struct Momentum<M: Trainable> {
     learning_rate: M::Scalar,
     momentum: M::Scalar,
+    nesterov: bool,
     velocity: M::Shape,
 }
 
@@ -103,6 +126,7 @@ impl<M: Trainable> Momentum<M> {
         Self {
             learning_rate,
             momentum,
+            nesterov: false,
             velocity: <M::Shape as Values<M::Scalar>>::zeros(),
         }
     }
@@ -110,6 +134,17 @@ impl<M: Trainable> Momentum<M> {
     /// ... oder über ein vorhandenes Netz, ohne den Typ hinzuschreiben.
     pub fn for_model(_model: &M, learning_rate: M::Scalar, momentum: M::Scalar) -> Self {
         Self::new(learning_rate, momentum)
+    }
+
+    /// Schaltet auf Nesterov-Momentum um, siehe oben.
+    #[must_use]
+    pub const fn with_nesterov(mut self) -> Self {
+        self.nesterov = true;
+        self
+    }
+
+    pub const fn is_nesterov(&self) -> bool {
+        self.nesterov
     }
 }
 
@@ -125,15 +160,17 @@ impl<M: Trainable> HasLearningRate<M::Scalar> for Momentum<M> {
 
 impl<M: Trainable> Optimizer<M> for Momentum<M> {
     fn step(&mut self, model: &mut M, batch_size: usize) {
-        let scale = self.learning_rate / M::Scalar::from_usize(batch_size);
+        let scale = self.learning_rate / batch_divisor::<M::Scalar>(batch_size);
         let momentum = self.momentum;
+        let nesterov = self.nesterov;
         let velocity = &mut self.velocity;
         let mut index = 0;
 
         model.visit_parameters(&mut |parameter, gradient| {
+            let step = scale * *gradient;
             let v = velocity.value_mut(index);
-            *v = momentum * *v - scale * gradient;
-            *parameter += *v;
+            *v = momentum * *v - step;
+            *parameter += if nesterov { momentum * *v - step } else { *v };
             index += 1;
         });
 
@@ -146,6 +183,7 @@ impl<M: Trainable> Clone for Momentum<M> {
         Self {
             learning_rate: self.learning_rate,
             momentum: self.momentum,
+            nesterov: self.nesterov,
             velocity: self.velocity,
         }
     }
@@ -160,6 +198,7 @@ where
         f.debug_struct("Momentum")
             .field("learning_rate", &self.learning_rate)
             .field("momentum", &self.momentum)
+            .field("nesterov", &self.nesterov)
             .field("velocity", &self.velocity)
             .finish()
     }

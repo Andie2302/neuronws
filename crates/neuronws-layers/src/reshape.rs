@@ -4,7 +4,7 @@ use crate::block::{Block, Operation};
 use crate::init::Initializer;
 use crate::random::Rng;
 use crate::scalar::Scalar;
-use crate::values::Values;
+use crate::values::{self, Values};
 
 /// Ordnet dieselben Zahlen in eine andere Form um, ohne zu rechnen.
 ///
@@ -67,7 +67,7 @@ impl<I: Values<T>, O: Values<T>, T: Scalar> Operation for Reshape<I, O, T> {
     type Params = ();
 
     fn forward(&self, _params: &(), input: &I) -> O {
-        copy_values(input)
+        values::reshape(input)
     }
 
     /// Der Gradient wandert unverändert zurück, nur wieder in der Form der Eingabe.
@@ -79,18 +79,10 @@ impl<I: Values<T>, O: Values<T>, T: Scalar> Operation for Reshape<I, O, T> {
         _output: &O,
         grad_output: &O,
     ) -> I {
-        copy_values(grad_output)
+        values::reshape(grad_output)
     }
 
     fn init_params<In: Initializer>(&self, _initializer: &In, _rng: &mut Rng) {}
-}
-
-fn copy_values<T: Scalar, From: Values<T>, To: Values<T>>(from: &From) -> To {
-    let mut to = To::zeros();
-    for i in 0..From::LEN {
-        *to.value_mut(i) = from.value(i);
-    }
-    to
 }
 
 /// Eine Umformungs-Schicht von `I` nach `O`.

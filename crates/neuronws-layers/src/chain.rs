@@ -91,11 +91,14 @@ impl<A: Trainable, B: Trainable<Scalar = A::Scalar>> Trainable for Chain<A, B> {
     /// Erst die Plätze der ersten, dann die der zweiten Schicht, wie beim Besuchen.
     type Shape = (A::Shape, B::Shape);
 
-    const PARAMETER_COUNT: usize = A::PARAMETER_COUNT + B::PARAMETER_COUNT;
-
-    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut Self::Scalar, Self::Scalar)) {
+    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut Self::Scalar, &mut Self::Scalar)) {
         self.first.visit_parameters(visitor);
         self.second.visit_parameters(visitor);
+    }
+
+    fn inspect_parameters(&self, visitor: &mut impl FnMut(Self::Scalar, Self::Scalar)) {
+        self.first.inspect_parameters(visitor);
+        self.second.inspect_parameters(visitor);
     }
 
     fn zero_grad(&mut self) {
