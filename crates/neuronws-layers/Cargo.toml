@@ -19,3 +19,7 @@ required-features = ["libm"]
 [[example]]
 name = "xor_seeds"
 required-features = ["libm"]
+
+[[example]]
+name = "xor_loss_comparison"
+required-features = ["libm"]

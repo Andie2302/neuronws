@@ -28,6 +28,8 @@ pub trait Scalar:
     fn tanh(self) -> Self;
     #[cfg(any(feature = "std", feature = "libm"))]
     fn sqrt(self) -> Self;
+    #[cfg(any(feature = "std", feature = "libm"))]
+    fn ln(self) -> Self;
 }
 
 impl Scalar for f32 {
@@ -69,6 +71,15 @@ impl Scalar for f32 {
     fn sqrt(self) -> Self {
         libm::sqrtf(self)
     }
+
+    #[cfg(feature = "std")]
+    fn ln(self) -> Self {
+        f32::ln(self)
+    }
+    #[cfg(all(feature = "libm", not(feature = "std")))]
+    fn ln(self) -> Self {
+        libm::logf(self)
+    }
 }
 
 impl Scalar for f64 {
@@ -109,5 +120,14 @@ impl Scalar for f64 {
     #[cfg(all(feature = "libm", not(feature = "std")))]
     fn sqrt(self) -> Self {
         libm::sqrt(self)
+    }
+
+    #[cfg(feature = "std")]
+    fn ln(self) -> Self {
+        f64::ln(self)
+    }
+    #[cfg(all(feature = "libm", not(feature = "std")))]
+    fn ln(self) -> Self {
+        libm::log(self)
     }
 }
