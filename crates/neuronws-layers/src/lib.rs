@@ -29,10 +29,12 @@ pub mod norm;
 pub mod optimizer;
 pub mod pooling;
 pub mod random;
+pub mod recurrent;
 pub mod reshape;
 pub mod residual;
 pub mod scalar;
 pub mod schedule;
+pub mod sequence;
 #[cfg(any(feature = "std", feature = "libm"))]
 pub mod softmax_layer;
 pub mod standardize;
