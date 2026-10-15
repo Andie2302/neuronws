@@ -37,3 +37,7 @@ required-features = ["libm"]
 [[example]]
 name = "build_your_own_layer"
 required-features = ["libm"]
+
+[[example]]
+name = "adam_classifier"
+required-features = ["libm"]

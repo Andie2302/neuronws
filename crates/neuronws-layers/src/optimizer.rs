@@ -16,6 +16,14 @@ pub trait Optimizer<M: Trainable> {
     fn step(&mut self, model: &mut M, batch_size: usize);
 }
 
+/// Ein Optimierer mit einer Lernrate `η`, die man lesen und ändern kann.
+///
+/// Das braucht ein Lernraten-Plan ([`crate::schedule`]), der `η` im Lauf des Trainings anpasst.
+pub trait HasLearningRate<T: Scalar> {
+    fn learning_rate(&self) -> T;
+    fn set_learning_rate(&mut self, learning_rate: T);
+}
+
 /// Stochastic Gradient Descent: `p ← p − η · g`.
 #[derive(Debug, Clone)]
 pub struct Sgd<T: Scalar = f32> {
@@ -25,6 +33,16 @@ pub struct Sgd<T: Scalar = f32> {
 impl<T: Scalar> Sgd<T> {
     pub const fn new(learning_rate: T) -> Self {
         Self { learning_rate }
+    }
+}
+
+impl<T: Scalar> HasLearningRate<T> for Sgd<T> {
+    fn learning_rate(&self) -> T {
+        self.learning_rate
+    }
+
+    fn set_learning_rate(&mut self, learning_rate: T) {
+        self.learning_rate = learning_rate;
     }
 }
 
@@ -92,6 +110,16 @@ impl<M: Trainable> Momentum<M> {
     /// ... oder über ein vorhandenes Netz, ohne den Typ hinzuschreiben.
     pub fn for_model(_model: &M, learning_rate: M::Scalar, momentum: M::Scalar) -> Self {
         Self::new(learning_rate, momentum)
+    }
+}
+
+impl<M: Trainable> HasLearningRate<M::Scalar> for Momentum<M> {
+    fn learning_rate(&self) -> M::Scalar {
+        self.learning_rate
+    }
+
+    fn set_learning_rate(&mut self, learning_rate: M::Scalar) {
+        self.learning_rate = learning_rate;
     }
 }
 

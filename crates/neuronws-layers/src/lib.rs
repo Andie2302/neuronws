@@ -13,9 +13,11 @@ pub mod neurons;
 pub mod optimizer;
 pub mod random;
 pub mod scalar;
+pub mod schedule;
 #[cfg(any(feature = "std", feature = "libm"))]
 pub mod softmax_layer;
 pub mod standardize;
+pub mod trainer;
 pub mod training;
 pub mod traits;
 pub mod values;

@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::optimizer::Optimizer;
+use crate::optimizer::{HasLearningRate, Optimizer};
 use crate::scalar::Scalar;
 use crate::traits::Trainable;
 use crate::values::Values;
@@ -64,14 +64,16 @@ impl<M: Trainable> AdamW<M> {
         self.epsilon = epsilon;
         self
     }
+}
 
-    /// Die Lernrate darf sich zwischen den Schritten ändern (siehe Lernraten-Pläne).
-    pub fn set_learning_rate(&mut self, learning_rate: M::Scalar) {
-        self.learning_rate = learning_rate;
+/// Die Lernrate darf sich zwischen den Schritten ändern (siehe [`crate::schedule`]).
+impl<M: Trainable> HasLearningRate<M::Scalar> for AdamW<M> {
+    fn learning_rate(&self) -> M::Scalar {
+        self.learning_rate
     }
 
-    pub fn learning_rate(&self) -> M::Scalar {
-        self.learning_rate
+    fn set_learning_rate(&mut self, learning_rate: M::Scalar) {
+        self.learning_rate = learning_rate;
     }
 }
 
@@ -162,13 +164,15 @@ impl<M: Trainable> Adam<M> {
     pub fn with_betas(self, beta1: M::Scalar, beta2: M::Scalar, epsilon: M::Scalar) -> Self {
         Self(self.0.with_betas(beta1, beta2, epsilon))
     }
+}
 
-    pub fn set_learning_rate(&mut self, learning_rate: M::Scalar) {
-        self.0.set_learning_rate(learning_rate);
+impl<M: Trainable> HasLearningRate<M::Scalar> for Adam<M> {
+    fn learning_rate(&self) -> M::Scalar {
+        self.0.learning_rate()
     }
 
-    pub fn learning_rate(&self) -> M::Scalar {
-        self.0.learning_rate()
+    fn set_learning_rate(&mut self, learning_rate: M::Scalar) {
+        self.0.set_learning_rate(learning_rate);
     }
 }
 

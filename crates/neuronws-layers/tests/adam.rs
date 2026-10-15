@@ -7,7 +7,7 @@ use neuronws_layers::adam::{Adam, AdamW};
 use neuronws_layers::chain::LayerExt;
 use neuronws_layers::dense_layer::DenseLayer;
 use neuronws_layers::loss::MeanSquaredError;
-use neuronws_layers::optimizer::{Momentum, Optimizer, Sgd};
+use neuronws_layers::optimizer::{HasLearningRate, Momentum, Optimizer, Sgd};
 use neuronws_layers::random::Rng;
 use neuronws_layers::training::{mean_loss, train_epoch};
 use neuronws_layers::traits::{BackwardPathMut, ForwardPathMut};
