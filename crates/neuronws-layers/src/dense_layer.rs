@@ -1,5 +1,5 @@
 use crate::traits::{
-    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer,
+    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
 
 pub struct DenseLayer<const IN: usize, const OUT: usize> {
@@ -29,10 +29,12 @@ impl<const IN: usize, const OUT: usize> DenseLayer<IN, OUT> {
         }
     }
 
-    /// Setzt die aufsummierten Gradienten auf 0 zurück.
-    pub fn zero_grad(&mut self) {
-        self.grad_weights = [[0.0; IN]; OUT];
-        self.grad_bias = [0.0; OUT];
+    pub const fn weights(&self) -> &[[f32; IN]; OUT] {
+        &self.weights
+    }
+
+    pub const fn bias(&self) -> &[f32; OUT] {
+        &self.bias
     }
 
     pub const fn grad_weights(&self) -> &[[f32; IN]; OUT] {
@@ -98,5 +100,23 @@ impl<const IN: usize, const OUT: usize> BackwardPathMut for DenseLayer<IN, OUT> 
                 .sum()
         });
         &self.grad_input
+    }
+}
+
+impl<const IN: usize, const OUT: usize> Trainable for DenseLayer<IN, OUT> {
+    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut f32, f32)) {
+        for (row, grad_row) in self.weights.iter_mut().zip(&self.grad_weights) {
+            for (w, &g) in row.iter_mut().zip(grad_row) {
+                visitor(w, g);
+            }
+        }
+        for (b, &g) in self.bias.iter_mut().zip(&self.grad_bias) {
+            visitor(b, g);
+        }
+    }
+
+    fn zero_grad(&mut self) {
+        self.grad_weights = [[0.0; IN]; OUT];
+        self.grad_bias = [0.0; OUT];
     }
 }

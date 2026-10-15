@@ -26,3 +26,14 @@ pub trait BackwardPath: BackwardData {
 pub trait BackwardPathMut: BackwardData {
     fn backward_mut(&mut self, input: &Self::BackwardInput) -> &Self::BackwardOutput;
 }
+
+/// Die Fähigkeit, lernbare Parameter samt Gradienten herzugeben.
+///
+/// Der Besucher (`visitor`) bekommt jeden Parameter und seinen aufsummierten Gradienten.
+/// Was damit passiert, entscheidet der Optimierer, nicht die Schicht.
+pub trait Trainable {
+    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut f32, f32));
+
+    /// Setzt alle aufsummierten Gradienten auf 0 zurück.
+    fn zero_grad(&mut self);
+}

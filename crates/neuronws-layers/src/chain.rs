@@ -1,5 +1,5 @@
 use crate::traits::{
-    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer,
+    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
 
 /// Hintereinanderschaltung zweier Schichten: die Ausgabe von `first` ist die Eingabe von `second`.
@@ -84,6 +84,18 @@ where
     fn backward_mut(&mut self, grad_output: &Self::BackwardInput) -> &Self::BackwardOutput {
         let mid = self.second.backward_mut(grad_output);
         self.first.backward_mut(mid)
+    }
+}
+
+impl<A: Trainable, B: Trainable> Trainable for Chain<A, B> {
+    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut f32, f32)) {
+        self.first.visit_parameters(visitor);
+        self.second.visit_parameters(visitor);
+    }
+
+    fn zero_grad(&mut self) {
+        self.first.zero_grad();
+        self.second.zero_grad();
     }
 }
 

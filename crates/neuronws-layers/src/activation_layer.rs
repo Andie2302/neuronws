@@ -1,6 +1,6 @@
 use crate::activation::Activation;
 use crate::traits::{
-    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer,
+    BackwardData, BackwardPathMut, Data, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
 
 /// Wendet eine Aktivierungsfunktion elementweise auf `N` Werte an.
@@ -64,4 +64,11 @@ impl<const N: usize, A: Activation> BackwardPathMut for ActivationLayer<N, A> {
         }
         &self.grad_input
     }
+}
+
+/// Die Aktivierungsschicht hat keine lernbaren Parameter, es gibt also nichts zu besuchen.
+impl<const N: usize, A: Activation> Trainable for ActivationLayer<N, A> {
+    fn visit_parameters(&mut self, _visitor: &mut impl FnMut(&mut f32, f32)) {}
+
+    fn zero_grad(&mut self) {}
 }
