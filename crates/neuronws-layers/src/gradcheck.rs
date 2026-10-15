@@ -16,6 +16,7 @@ use crate::activation::Activation;
 use crate::block::Operation;
 use crate::loss::Loss;
 use crate::scalar::Scalar;
+use crate::traits::{BackwardPathMut, ForwardPath, ForwardPathMut, Trainable};
 use crate::values::Values;
 
 /// Prüft `∂L/∂Eingabe` und `∂L/∂Parameter` für den Verlust `L = Σ c[k] · Ausgabe[k]` mit
@@ -126,4 +127,95 @@ pub fn assert_loss_gradient_matches<T: Scalar, V: Values<T>, L: Loss>(
             "Ableitung nach Ausgabe[{index}]: analytisch {a}, numerisch {n}"
         );
     }
+}
+
+/// Prüft die Ableitungen eines ganzen **Netzes** (einer `Chain`, eines `Residual`, eines `Fork`, …)
+/// gegen numerische Ableitungen, nach der Eingabe und nach jedem Parameter.
+///
+/// Es arbeitet wie [`assert_gradients_match`] mit dem Verlust `L = Σ c[k] · Ausgabe[k]`. Gerechnet
+/// wird einmal über den Lernweg (`forward_mut`, `backward_mut`) und die numerischen Ableitungen
+/// über den Einsatzweg (`forward`). Beide müssen also dieselbe Funktion berechnen: Das gilt nicht
+/// für Schichten mit Zufall (Dropout), bei denen sie sich absichtlich unterscheiden.
+///
+/// Danach sind die Gradienten des Modells wieder auf 0 gesetzt.
+///
+/// # Panics
+/// Wenn eine Ableitung nicht stimmt, mit der Angabe, welche.
+pub fn assert_layer_gradients_match<M, T, I, O>(model: &mut M, input: I, epsilon: T, tolerance: f64)
+where
+    T: Scalar,
+    I: Values<T>,
+    O: Values<T>,
+    M: ForwardPath<ForwardInput = I, ForwardOutput = O>
+        + ForwardPathMut<ForwardInput = I, ForwardOutput = O>
+        + BackwardPathMut<BackwardInput = O, BackwardOutput = I>
+        + Trainable<Scalar = T>,
+{
+    let weight = |k: usize| T::from_f32(((k * 7 + 3) % 11) as f32 / 3.0 - 1.5);
+    let loss = |model: &M, input: &I| {
+        let output = model.forward(input);
+        (0..O::LEN).fold(T::ZERO, |sum, k| sum + weight(k) * output.value(k))
+    };
+
+    model.zero_grad();
+    model.forward_mut(&input);
+    let mut grad_output = O::zeros();
+    for k in 0..O::LEN {
+        *grad_output.value_mut(k) = weight(k);
+    }
+    let grad_input = *model.backward_mut(&grad_output);
+    let analytic = gradients_of(model);
+    let two_eps = T::TWO * epsilon;
+
+    let check = |what: &str, index: usize, a: T, n: T| {
+        let (a, n) = (a.to_f64(), n.to_f64());
+        let allowed = tolerance * (1.0 + a.abs().max(n.abs()));
+        assert!(
+            (a - n).abs() <= allowed,
+            "Ableitung nach {what}[{index}]: analytisch {a}, numerisch {n}"
+        );
+    };
+
+    for index in 0..I::LEN {
+        let (mut up, mut down) = (input, input);
+        *up.value_mut(index) += epsilon;
+        *down.value_mut(index) -= epsilon;
+        let numeric = (loss(model, &up) - loss(model, &down)) / two_eps;
+        check("Eingabe", index, grad_input.value(index), numeric);
+    }
+
+    for index in 0..M::PARAMETER_COUNT {
+        let mut shifted_loss = |delta: T| {
+            let mut position = 0;
+            model.visit_parameters(&mut |parameter, _| {
+                if position == index {
+                    *parameter += delta;
+                }
+                position += 1;
+            });
+            let value = loss(model, &input);
+            let mut position = 0;
+            model.visit_parameters(&mut |parameter, _| {
+                if position == index {
+                    *parameter -= delta;
+                }
+                position += 1;
+            });
+            value
+        };
+        let numeric = (shifted_loss(epsilon) - shifted_loss(-epsilon)) / two_eps;
+        check("Parameter", index, analytic.value(index), numeric);
+    }
+    model.zero_grad();
+}
+
+/// Die aufsummierten Gradienten des Modells als Gruppe von der Form `Shape`.
+fn gradients_of<M: Trainable>(model: &M) -> M::Shape {
+    let mut gradients = <M::Shape as Values<M::Scalar>>::zeros();
+    let mut index = 0;
+    model.inspect_parameters(&mut |_, gradient| {
+        *gradients.value_mut(index) = gradient;
+        index += 1;
+    });
+    gradients
 }

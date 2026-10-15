@@ -1,8 +1,11 @@
 //! Softmax und Standardisierung über eine Achse: Kanäle von Bildern.
 
+// Die Tests laufen mit Zeilen- und Spaltennummern über mehrere Felder. Das ist hier lesbarer als Iteratoren.
+#![allow(clippy::needless_range_loop)]
+
 use neuronws_layers::block::Block;
 use neuronws_layers::gradcheck::assert_gradients_match;
-use neuronws_layers::standardize::{ChannelStandardization, Standardize, StandardizeChannels};
+use neuronws_layers::standardize::{ChannelStandardization, StandardizeChannels};
 use neuronws_layers::traits::{ForwardPath, Trainable};
 
 #[cfg(any(feature = "std", feature = "libm"))]
@@ -104,6 +107,7 @@ mod softmax {
 mod channels {
     use super::*;
 
+    #[cfg(any(feature = "std", feature = "libm"))]
     fn images() -> [[[[f64; 2]; 1]; 2]; 2] {
         // zwei Beispiele, zwei Kanäle zu 1×2 Pixeln
         [
@@ -149,6 +153,8 @@ mod channels {
     #[cfg(any(feature = "std", feature = "libm"))]
     #[test]
     fn with_scalar_channels_it_equals_the_vector_standardize() {
+        use neuronws_layers::standardize::Standardize;
+
         let data = [[1.0_f64, 1000.0], [2.0, 2000.0], [4.0, 3000.0]];
         let vector = Standardize::<2, f64>::fit(&data);
         let channels = Block::<ChannelStandardization<f64, 2, f64>>::fit(&data);

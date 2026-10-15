@@ -28,6 +28,7 @@ pub mod optimizer;
 pub mod pooling;
 pub mod random;
 pub mod reshape;
+pub mod residual;
 pub mod scalar;
 pub mod schedule;
 #[cfg(any(feature = "std", feature = "libm"))]
