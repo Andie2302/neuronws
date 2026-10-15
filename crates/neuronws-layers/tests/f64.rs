@@ -66,6 +66,10 @@ fn scalar_constants_and_conversions() {
     assert_eq!(<f32 as Scalar>::TWO, 2.0);
     assert_eq!(<f64 as Scalar>::from_usize(3), 3.0);
     assert_eq!(<f64 as Scalar>::from_f32(0.5), 0.5);
+    assert_eq!(<f32 as Scalar>::to_f64(0.25), 0.25);
+    assert_eq!(<f64 as Scalar>::to_f64(0.1), 0.1);
+    // f32 -> f64 verändert den Wert nicht, auch wenn er nicht genau darstellbar ist
+    assert_eq!(<f32 as Scalar>::to_f64(0.1_f32), f64::from(0.1_f32));
 }
 
 #[cfg(any(feature = "std", feature = "libm"))]

@@ -18,3 +18,7 @@ neuronws-layers = { workspace = true }
 [[example]]
 name = "recognize_digits"
 required-features = ["libm"]
+
+[[example]]
+name = "input_scale"
+required-features = ["libm"]

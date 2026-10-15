@@ -23,6 +23,9 @@ pub trait Scalar:
     fn from_f32(value: f32) -> Self;
     fn from_usize(value: usize) -> Self;
 
+    /// Für Ausgaben und Diagnose: der Wert als `f64` (bei `f32` verlustfrei).
+    fn to_f64(self) -> f64;
+
     #[cfg(any(feature = "std", feature = "libm"))]
     fn exp(self) -> Self;
     #[cfg(any(feature = "std", feature = "libm"))]
@@ -44,6 +47,10 @@ impl Scalar for f32 {
 
     fn from_usize(value: usize) -> Self {
         value as f32
+    }
+
+    fn to_f64(self) -> f64 {
+        f64::from(self)
     }
 
     #[cfg(all(feature = "std", not(feature = "libm")))]
@@ -94,6 +101,10 @@ impl Scalar for f64 {
 
     fn from_usize(value: usize) -> Self {
         value as f64
+    }
+
+    fn to_f64(self) -> f64 {
+        self
     }
 
     #[cfg(all(feature = "std", not(feature = "libm")))]
