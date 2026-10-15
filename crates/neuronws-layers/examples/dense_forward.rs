@@ -7,7 +7,8 @@ use neuronws_layers::traits::ForwardPath;
 
 fn main() {
     // Jede Zeile ist die Gewichtszeile eines Neurons.
-    let layer = DenseLayer::new([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], [0.5, 0.0, -1.0]);
+    let layer =
+        DenseLayer::<2, 3, f32>::new([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], [0.5, 0.0, -1.0]);
 
     let input = [1.0, 10.0];
     let output = layer.forward(&input);

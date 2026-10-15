@@ -1,42 +1,43 @@
 use crate::activation::Activation;
+use crate::scalar::Scalar;
 use crate::traits::{
     BackwardData, BackwardPathMut, ForwardData, ForwardPath, ForwardPathMut, Layer, Trainable,
 };
 
 /// Wendet eine Aktivierungsfunktion elementweise auf `N` Werte an.
-pub struct ActivationLayer<const N: usize, A: Activation> {
+pub struct ActivationLayer<const N: usize, A: Activation, T: Scalar = f32> {
     activation: A,
     /// Die Eingabe `z` des letzten `forward_mut`, die Ableitung `φ'(z)` braucht sie.
-    last_input: [f32; N],
-    output: [f32; N],
-    grad_input: [f32; N],
+    last_input: [T; N],
+    output: [T; N],
+    grad_input: [T; N],
 }
 
-impl<const N: usize, A: Activation> ActivationLayer<N, A> {
+impl<const N: usize, A: Activation, T: Scalar> ActivationLayer<N, A, T> {
     pub const fn new(activation: A) -> Self {
         Self {
             activation,
-            last_input: [0.0; N],
-            output: [0.0; N],
-            grad_input: [0.0; N],
+            last_input: [T::ZERO; N],
+            output: [T::ZERO; N],
+            grad_input: [T::ZERO; N],
         }
     }
 }
 
-impl<const N: usize, A: Activation> Layer for ActivationLayer<N, A> {}
+impl<const N: usize, A: Activation, T: Scalar> Layer for ActivationLayer<N, A, T> {}
 
-impl<const N: usize, A: Activation> ForwardData for ActivationLayer<N, A> {
-    type ForwardInput = [f32; N];
-    type ForwardOutput = [f32; N];
+impl<const N: usize, A: Activation, T: Scalar> ForwardData for ActivationLayer<N, A, T> {
+    type ForwardInput = [T; N];
+    type ForwardOutput = [T; N];
 }
 
-impl<const N: usize, A: Activation> ForwardPath for ActivationLayer<N, A> {
+impl<const N: usize, A: Activation, T: Scalar> ForwardPath for ActivationLayer<N, A, T> {
     fn forward(&self, input: &Self::ForwardInput) -> Self::ForwardOutput {
         input.map(|z| self.activation.apply(z))
     }
 }
 
-impl<const N: usize, A: Activation> ForwardPathMut for ActivationLayer<N, A> {
+impl<const N: usize, A: Activation, T: Scalar> ForwardPathMut for ActivationLayer<N, A, T> {
     fn forward_mut(&mut self, input: &Self::ForwardInput) -> &Self::ForwardOutput {
         self.last_input = *input;
         self.output = self.forward(input);
@@ -44,12 +45,12 @@ impl<const N: usize, A: Activation> ForwardPathMut for ActivationLayer<N, A> {
     }
 }
 
-impl<const N: usize, A: Activation> BackwardData for ActivationLayer<N, A> {
-    type BackwardInput = [f32; N];
-    type BackwardOutput = [f32; N];
+impl<const N: usize, A: Activation, T: Scalar> BackwardData for ActivationLayer<N, A, T> {
+    type BackwardInput = [T; N];
+    type BackwardOutput = [T; N];
 }
 
-impl<const N: usize, A: Activation> BackwardPathMut for ActivationLayer<N, A> {
+impl<const N: usize, A: Activation, T: Scalar> BackwardPathMut for ActivationLayer<N, A, T> {
     /// Kettenregel elementweise: `∂L/∂z[i] = g[i] · φ'(z[i])`.
     fn backward_mut(&mut self, grad_output: &Self::BackwardInput) -> &Self::BackwardOutput {
         for ((grad_z, &g), &z) in self
@@ -65,8 +66,10 @@ impl<const N: usize, A: Activation> BackwardPathMut for ActivationLayer<N, A> {
 }
 
 /// Die Aktivierungsschicht hat keine lernbaren Parameter, es gibt also nichts zu besuchen.
-impl<const N: usize, A: Activation> Trainable for ActivationLayer<N, A> {
-    fn visit_parameters(&mut self, _visitor: &mut impl FnMut(&mut f32, f32)) {}
+impl<const N: usize, A: Activation, T: Scalar> Trainable for ActivationLayer<N, A, T> {
+    type Scalar = T;
+
+    fn visit_parameters(&mut self, _visitor: &mut impl FnMut(&mut T, T)) {}
 
     fn zero_grad(&mut self) {}
 }

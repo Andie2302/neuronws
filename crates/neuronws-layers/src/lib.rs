@@ -4,8 +4,7 @@ pub mod activation_layer;
 pub mod chain;
 pub mod dense_layer;
 pub mod loss;
-#[cfg(any(feature = "std", feature = "libm"))]
-mod math;
 pub mod optimizer;
 pub mod random;
+pub mod scalar;
 pub mod traits;

@@ -85,8 +85,10 @@ where
     }
 }
 
-impl<A: Trainable, B: Trainable> Trainable for Chain<A, B> {
-    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut f32, f32)) {
+impl<A: Trainable, B: Trainable<Scalar = A::Scalar>> Trainable for Chain<A, B> {
+    type Scalar = A::Scalar;
+
+    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut Self::Scalar, Self::Scalar)) {
         self.first.visit_parameters(visitor);
         self.second.visit_parameters(visitor);
     }

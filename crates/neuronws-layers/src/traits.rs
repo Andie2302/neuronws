@@ -30,7 +30,9 @@ pub trait BackwardPathMut: BackwardData {
 /// Der Besucher (`visitor`) bekommt jeden Parameter und seinen aufsummierten Gradienten.
 /// Was damit passiert, entscheidet der Optimierer, nicht die Schicht.
 pub trait Trainable {
-    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut f32, f32));
+    type Scalar;
+
+    fn visit_parameters(&mut self, visitor: &mut impl FnMut(&mut Self::Scalar, Self::Scalar));
 
     /// Setzt alle aufsummierten Gradienten auf 0 zurück.
     fn zero_grad(&mut self);

@@ -24,7 +24,7 @@ fn sgd_step_moves_parameters_against_the_gradient_and_clears_it() {
 
 #[test]
 fn dense_layer_learns_a_line() {
-    let mut layer = DenseLayer::new([[0.0]], [0.0]);
+    let mut layer = DenseLayer::<1, 1, f32>::new([[0.0]], [0.0]);
     let sgd = Sgd::new(0.05);
     let data = [-2.0, -1.0, 0.0, 1.0, 2.0].map(|x| ([x], [2.0 * x + 1.0]));
 
