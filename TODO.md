@@ -47,6 +47,61 @@ unter **Entscheidungen** (ausführlicher in der [README](README.md)).
   auf drei Stellen. Bitgleich ist er bei der Erstellung geprüft worden, steht aber nicht als Test
   im Projekt, weil er bei jeder Änderung der Rechenreihenfolge neu eingetragen werden müsste.
 
+### Verbesserungen, bei einer Durchsicht des Codes gefunden
+
+Nach Wichtigkeit sortiert. Jeder Punkt nennt die Stelle, an der es auffiel.
+
+- [ ] ! **`EarlyStopping` und `NaN`.** In [`early_stopping.rs`](crates/neuronws-layers/src/early_stopping.rs)
+  (`observe`) gilt ein Verlust nur als besser, wenn `validation_loss < best - min_delta`. Ist der
+  allererste Prüfverlust `NaN` (Training ist explodiert), wird er als `best` gespeichert, und danach ist
+  *jeder* Vergleich falsch: Es gibt nie wieder eine Verbesserung. Ein späteres `NaN` nach guten Werten
+  zählt dagegen nur als "keine Verbesserung". Beides ist unschön. Vorschlag: `NaN` und `±∞` nie als
+  `best` übernehmen und als eigenes Ergebnis `Progress::Diverged` melden. Dazu zuerst einen Test
+  schreiben, der den Fehler zeigt.
+- [ ] ! **Divergenz überall erkennen, nicht nur im Early Stopping.** Im ganzen Crate gibt es nur eine
+  einzige `is_nan`-Prüfung (in `persist.rs`). `Trainer::epoch` liefert bei explodierenden Gewichten
+  still `NaN` zurück, und `fit` läuft trotzdem alle Runden durch. Vorschlag: eine
+  `Scalar::is_finite`-Methode (mit `x == x && x.abs() != INF` geht das ohne `std`) und eine Variante
+  von `fit`, die bei nicht endlichem Verlust abbricht. Dazu passt auch ein Test, dass `ClipNorm`
+  eine absichtlich zu große Lernrate abfängt.
+- [ ] ! **Lizenz und Paket-Angaben fehlen.** Es gibt keine `LICENSE`-Datei, und die `Cargo.toml`-Dateien
+  haben weder `license`, `description`, `repository` noch `rust-version`. Ohne Lizenz darf niemand den
+  Code benutzen, auch wenn er öffentlich ist. Vorschlag: `MIT OR Apache-2.0` (wie in der
+  Rust-Welt üblich) in `[workspace.package]` eintragen und beide Textdateien anlegen. Zusammen mit dem
+  Punkt "Rust-Version festlegen" oben erledigen.
+- [ ] **`Rng` liefert nur `f32`.** `next_f32` nutzt 24 Bit. Für `f64`-Netze (`Normal`, `Dropout`,
+  `Reparameterize`) wird deshalb nur mit der Genauigkeit eines `f32` gewürfelt, und die Werte werden
+  dann hochgewandelt. Für Gewichte egal, für Statistik-Tests aber ungenau. Vorschlag: `next_f64` mit 53
+  Bit und generisch über `Scalar` (`rng.next_scalar::<T>()`).
+- [ ] **Fehler ohne Absturz.** Über 50 `assert!` in der Bibliothek, die meisten sind echte
+  Programmierfehler (Batchgröße 0, leere Daten) und das ist so entschieden. Auf einem Mikrocontroller
+  bedeutet ein Absturz aber Neustart. Zumindest dort, wo *Daten* schuld sein können und nicht der
+  Code (`train_test_split` mit zu wenig Beispielen, `fit` mit leeren Daten, `confusion_matrix` mit Klasse
+  außerhalb des Bereichs), wären `try_`-Varianten mit einem kleinen Fehler-`enum` sauberer. Vorher
+  entscheiden, wo die Grenze liegt, und in "Entscheidungen" festhalten.
+- [ ] **CI ausbauen:** (a) ein Job mit der *ältesten* unterstützten Rust-Version (`rust-version`), damit
+  die Zusage stimmt, (b) `cargo doc --document-private-items` einmal ansehen, (c) `cargo miri test` für
+  `persist` und `values` (kein `unsafe`, aber Miri findet auch Überläufe und Indexfehler), (d) einmal
+  im Monat ein geplanter Lauf mit dem neuesten `nightly`-Clippy, damit neue Warnungen früh auffallen,
+  ohne die normale CI zu stören.
+- [ ] **Zufallsgestützte Tests (Property-Tests) ohne Abhängigkeit.** Wir haben `Rng` schon. Ein kleiner
+  Hilfsrahmen (`for seed in 0..200 { … }`) könnte für `persist` (beliebige Bytes dürfen nie abstürzen,
+  nur `Err` liefern), `conv_output_size` (stimmt mit der Schleifenrechnung überein) und `SoftmaxAcross`
+  (Summe ist 1, auch bei großen Eingaben) viele Fälle prüfen. Heute stehen dort einzelne Beispiele.
+- [ ] **Numerische Stabilität gezielt testen.** Es gibt Tests für Softmax und Kreuzentropie, aber keinen,
+  der große Werte (±1000) oder winzige Wahrscheinlichkeiten (nahe 0) durch `SoftmaxCrossEntropy`,
+  `Sigmoid` und `BinaryCrossEntropy` schickt und prüft, dass nichts `NaN` oder `∞` wird.
+- [ ] **Lernpfad für Einsteiger.** 18 Beispiele liegen nebeneinander, die Reihenfolge ergibt sich nur aus
+  den Namen. Eine nummerierte Liste in der README ("1. `dense_forward` → 2. `learn_linear` → 3.
+  `learn_xor` → …"), jeweils mit einem Satz "was man danach versteht", würde den Weg vom naiven
+  Perceptron bis zum Trainer zeigen. Passt zum Ziel des Projekts, Rust und neuronale Netze zu lernen.
+- [ ] **`CHANGELOG.md` und Versionsregeln.** Alles steht auf `0.1.0`. Sobald jemand anderes das nutzt,
+  braucht er eine Liste der Änderungen, vor allem bei Änderungen an `Operation` und `Trainable`.
+- [ ] **Die über 60 einzelnen Testdateien** in `crates/neuronws-layers/tests/` (`loss.rs`,
+  `more_losses.rs`, `activation.rs`, `activation_backward.rs`, `smooth_activations.rs`,
+  `more_activations.rs`, …) sind historisch gewachsen. Nach Thema zusammenlegen (ein Ordner je Thema
+  mit `mod.rs`) würde das Suchen erleichtern. Reine Aufräumarbeit, kein Zeitdruck.
+
 ## Andere Netzarten
 
 Unser Stand war ein Multi-Layer-Perceptron, der Unterbau ist aber allgemeiner: eine Kette von
